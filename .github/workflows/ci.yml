@@ -9,7 +9,8 @@ permissions:
   contents: read
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Ubuntu 26.04 hosted runner currently uses x86-64-v3 glibc, incompatible with Ivy Bridge emulation.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -23,7 +24,7 @@ jobs:
       - run: bun run compile
       - run: bash scripts/smoke.sh
       - name: Install x86 CPU emulator
-        run: sudo apt-get update && sudo apt-get install -y qemu-user
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-user
       - name: Verify standalone on emulated Ivy Bridge (no AVX2)
         run: bash scripts/legacy-cpu-smoke.sh
       - run: bash scripts/docker-smoke.sh
