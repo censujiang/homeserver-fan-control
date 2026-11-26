@@ -9,7 +9,7 @@
 
 面向家庭服务器、个人工作室及小型办公室的服务器智能散热管理项目。采用 Nuxt + Vue SPA、Nitro 后台任务、Bun 与 SQLite；浏览器关闭后监控仍独立运行。硬件驱动与温控策略通过统一插件接口解耦。
 
-**当前版本为公开 Alpha 安全预览，并非生产级风扇控制器。** Local IPMI 仍只读；iMana 200 SSH 支持显式启用的实验 ADAPTIVE（限定固件/主板、硬件健康、有限租约及读回）。默认 MONITOR；真实调速须现场监督验收。
+**v0.3.0 为首个正式发行版。** 采用 Material Design 3 风格后台，支持响应式导航、亮暗主题与中英文切换。真实硬件调速仍属于实验能力，并非生产级散热控制器。 Local IPMI 仍只读；iMana 200 SSH 支持显式启用的实验 ADAPTIVE（限定固件/主板、硬件健康、有限租约及读回）。默认 MONITOR；真实调速须现场监督验收。
 
 ### 功能
 
@@ -27,7 +27,7 @@
 curl -fL --retry 2 https://raw.githubusercontent.com/censujiang/homeserver-fan-control/master/install.sh -o install.sh && bash install.sh
 ```
 
-建议先阅读 [install.sh](install.sh)，再执行；脚本需要 curl、python3、coreutils。Docker 模式要求宿主机已安装 Docker；独立部署不需要 Bun/Node.js。默认选择包含 Alpha 的预览通道；附加 `--stable` 只选稳定版。按 SemVer 在已发布、匹配附件齐全的 Release 中选择最高版本，不依赖 API 顺序。最低支持 alpha.4（老款 CPU 兼容修复）。
+建议先阅读 [install.sh](install.sh)，再执行；脚本需要 curl、python3、coreutils。Docker 模式要求宿主机已安装 Docker；独立部署不需要 Bun/Node.js。默认安装稳定版；附加 `--preview` 包含预发行版。按 SemVer 在已发布、匹配附件齐全的 Release 中选择最高版本，不依赖 API 顺序。最低支持 alpha.4（老款 CPU 兼容修复）。
 
 同一命令可再次运行更新已有安装。脚本会校验 SHA-256、检测已有二进制或标准 Docker 容器，保留数据并备份旧版本。已有 systemd 服务可在核验进程后原位重启；旧 Screen/前台实例须先停止。首次安装默认回环监听，也可选择 0.0.0.0 并确认可信局域网初始化，脚本自动开启首次设置权限。请先限制管理端口访问，完成管理员初始化后移除临时授权；不向公网开放。自定义 Docker/Compose 配置请使用原部署定义更新，脚本不会擅自丢弃设备、权限或挂载。
 
@@ -190,7 +190,7 @@ GitHub Actions 验证 Nuxt 构建、单文件独立运行和 Docker 容器；版
 
 HomeServer Fan Control is an open-source cooling-management project for home servers, studios and small offices. It combines a Nuxt/Vue SPA, persistent Nitro background scheduler, Bun and SQLite. Monitoring is independent of the browser; a shared plugin interface separates hardware transports from control policy.
 
-**This is a public alpha safety preview, not a production-ready fan controller.** Local IPMI remains read-only; iMana 200 SSH supports explicit experimental ADAPTIVE for the recorded firmware/board, with health gates, finite leases and readback. Default MONITOR; supervise physical tests.
+**v0.3.0 is the first stable software release**, with a Material Design 3-inspired responsive UI, light/dark themes and Chinese/English switching. Physical fan control remains experimental, not production-qualified. Local IPMI remains read-only; iMana 200 SSH supports explicit experimental ADAPTIVE for the recorded firmware/board, with health gates, finite leases and readback. Default MONITOR; supervise physical tests.
 
 ### Features
 
@@ -208,7 +208,7 @@ Download and review the unified installer on Linux x86_64, then select standalon
 curl -fL --retry 2 https://raw.githubusercontent.com/censujiang/homeserver-fan-control/master/install.sh -o install.sh && bash install.sh
 ```
 
-Requires curl, python3 and coreutils; Docker mode requires an existing Docker Engine. Standalone needs no Bun or Node.js. Preview (including Alpha) is the default; use `--stable` for stable releases only. The installer chooses the highest SemVer among published releases with matching uploaded assets, regardless of API order; alpha.4 is the minimum for legacy CPU compatibility. Run again to update. Verified existing systemd services can be restarted in place; stop older foreground/Screen processes first. Standard Docker named-volume deployments are supported; custom Docker/Compose deployments must use their original definition. First installation defaults to loopback but also supports 0.0.0.0 with explicit restricted-LAN setup confirmation. Initialize immediately; remove the temporary setup permission afterward.
+Requires curl, python3 and coreutils; Docker mode requires an existing Docker Engine. Standalone needs no Bun or Node.js. Stable is the default; use `--preview` to include pre-releases. The installer chooses the highest SemVer among published releases with matching uploaded assets, regardless of API order; alpha.4 is the minimum for legacy CPU compatibility. Run again to update. Verified existing systemd services can be restarted in place; stop older foreground/Screen processes first. Standard Docker named-volume deployments are supported; custom Docker/Compose deployments must use their original definition. First installation defaults to loopback but also supports 0.0.0.0 with explicit restricted-LAN setup confirmation. Initialize immediately; remove the temporary setup permission afterward.
 
 ### Quick start: standalone executable
 

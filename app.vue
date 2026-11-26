@@ -1,11 +1,19 @@
 <script setup lang="ts">
+import MdIcon from './components/MdIcon.vue'
 import type { AutostartStatus } from './shared/autostart'
-import { type UpdateStatus, type Channel, releasePage } from './shared/release'
+import { type UpdateStatus, type Channel, releasePage, currentVersion } from './shared/release'
 import { defaultPolicy, policySchema, type Manifest, type Instance, type Policy } from './shared/model'
 type PublicInstance=Omit<Instance,'config'> & {configuredFields:string[];live:{online:boolean;error?:string;control?:'confirmed'|'auto'|'blocked'|'suspended';sample?:{at:number;identity:string|null;health:string;fanMode?:string;fanLevel?:number;leaseRemaining?:number;sensors:{id:string;name:string;kind:string;value:number|null;unit:string;health:string;raw?:string;valid?:boolean}[]};capability?:{reason:string;write:boolean;timedFallback:boolean;controlEligible?:boolean};decision?:{target:number|null;reason:string}}}
 type Dashboard={plugins:Manifest[];instances:PublicInstance[];events:{id:number;at:number;message:string;instance:string|null}[]}
 const token=ref(''), password=ref(''), confirmPassword=ref(''), needsSetup=ref(false), setupAllowed=ref(false), error=ref(''), busy=ref(false), dash=ref<Dashboard>(), tab=ref('monitor'), dark=ref(false), lang=ref('zh')
 const text=(zh:string,en:string)=>lang.value==='zh'?zh:en
+const navigation=[{id:'monitor',zh:'实时监控',en:'Monitoring',icon:'monitor'},{id:'servers',zh:'服务器与策略',en:'Servers & policies',icon:'dns'},{id:'plugins',zh:'插件管理',en:'Plugins',icon:'extension'},{id:'history',zh:'历史采样',en:'History',icon:'history'},{id:'events',zh:'事件记录',en:'Events',icon:'event'},{id:'updates',zh:'软件更新',en:'Updates',icon:'update'},{id:'startup',zh:'启动管理',en:'Startup',icon:'power'}] as const
+const drawer=ref(false)
+const onlineCount=computed(()=>dash.value?.instances.filter(i=>i.live.online).length??0)
+const controlCount=computed(()=>dash.value?.instances.filter(i=>i.live.control==='confirmed').length??0)
+function navigate(id:string){tab.value=id;drawer.value=false}
+watch(lang,v=>{document.documentElement.lang=v==='zh'?'zh-CN':'en';localStorage.setItem('hsfc-lang',v)})
+watch(dark,v=>{localStorage.setItem('hsfc-theme',v?'dark':'light')})
 const guide='https://github.com/censujiang/homeserver-fan-control/blob/master/'
 const sensorGroups=[{id:'temperature',zh:'温度',en:'Temperature',kinds:['temperature','thermal-margin']},{id:'rpm',zh:'风扇转速',en:'Fan speeds',kinds:['rpm','percent']},{id:'power',zh:'功耗',en:'Power',kinds:['power']},{id:'discrete',zh:'设备状态（原始事件位）',en:'Device state (raw event bits)',kinds:['discrete']}]
 const sensorFilter=ref(''),showRaw=ref(false),showEditor=ref(false),advancedPolicy=ref(false)
@@ -126,15 +134,26 @@ async function stopControl(i:PublicInstance){
 async function remove(id:string){if(!confirm(text('删除此服务器配置？','Remove this server?')))return;await action(async()=>{await $fetch('/api/instances/'+id,{method:'DELETE',headers:auth()});await refresh()})}
 async function readHistory(){if(!historyId.value)return;await action(async()=>{history.value=await $fetch('/api/history',{headers:auth(),query:{id:historyId.value,from:Date.now()-86400000}})})}
 let timer:ReturnType<typeof setInterval>|undefined
-onMounted(async()=>{updateWaiting.value=sessionStorage.getItem('updateWaiting')??'';updateDeadline.value=Number(sessionStorage.getItem('updateDeadline')??0);updateOutcome.value=sessionStorage.getItem('updateOutcome')??'';sessionStorage.removeItem('updateOutcome');reset();showEditor.value=false;token.value=sessionStorage.getItem('token')??'';dark.value=matchMedia('(prefers-color-scheme: dark)').matches;const s=await $fetch<{setup:boolean;allowed:boolean}>('/api/auth/status');needsSetup.value=s.setup;setupAllowed.value=s.allowed;await refresh();timer=setInterval(()=>{void refresh();void refreshUpdate()},5000)})
+onMounted(async()=>{updateWaiting.value=sessionStorage.getItem('updateWaiting')??'';updateDeadline.value=Number(sessionStorage.getItem('updateDeadline')??0);updateOutcome.value=sessionStorage.getItem('updateOutcome')??'';sessionStorage.removeItem('updateOutcome');reset();showEditor.value=false;token.value=sessionStorage.getItem('token')??'';lang.value=localStorage.getItem('hsfc-lang')==='en'?'en':'zh';dark.value=localStorage.getItem('hsfc-theme')?localStorage.getItem('hsfc-theme')==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.lang=lang.value==='zh'?'zh-CN':'en';const s=await $fetch<{setup:boolean;allowed:boolean}>('/api/auth/status');needsSetup.value=s.setup;setupAllowed.value=s.allowed;await refresh();timer=setInterval(()=>{void refresh();void refreshUpdate()},5000)})
 onBeforeUnmount(()=>clearInterval(timer))
 </script>
 <template>
- <main :class="{dark}">
-  <header><div><small>HOMESERVER / CONTROL</small><h1>{{text('智能散热管理','Fan Control')}}</h1></div><div class="actions"><button @click="lang=lang==='zh'?'en':'zh'">{{lang==='zh'?'EN':'中文'}}</button><button @click="dark=!dark">{{dark?'☀':'☾'}}</button><button v-if="token" @click="signOut">{{text('退出','Sign out')}}</button></div></header>
+ <main :class="{dark,authenticated:!!token}">
+  <header class="top-app-bar">
+   <div class="brand"><button v-if="token" type="button" class="icon-button menu-toggle" :aria-label="text('打开导航','Open navigation')" :aria-expanded="drawer" aria-controls="main-navigation" @click="drawer=!drawer"><MdIcon name="menu"/></button><div class="brand-icon"><MdIcon name="fan"/></div><div class="brand-text"><h1>HomeServer Fan Control</h1><small>{{text('智能散热管理','Intelligent cooling')}}</small></div></div>
+   <div class="actions top-actions"><span class="version-label">v{{currentVersion}}</span><button class="icon-button" :aria-label="text('切换语言','Change language')" @click="lang=lang==='zh'?'en':'zh'">{{lang==='zh'?'EN':'中'}}</button><button class="icon-button" :aria-label="text('切换主题','Change theme')" :aria-pressed="dark" @click="dark=!dark"><MdIcon :name="dark?'sun':'moon'"/></button><button v-if="token" class="icon-button" :aria-label="text('退出登录','Sign out')" @click="signOut"><MdIcon name="logout"/></button></div>
+  </header>
+  <button v-if="token&&drawer" class="drawer-scrim" :aria-label="text('关闭导航','Close navigation')" @click="drawer=false"/>
+  <nav v-if="token" id="main-navigation" :class="{open:drawer}" :aria-label="text('主导航','Main navigation')" @keydown.esc="drawer=false">
+   <div class="nav-label">{{text('工作区','WORKSPACE')}}</div>
+   <button v-for="item in navigation" :key="item.id" :class="{active:tab===item.id}" :aria-current="tab===item.id?'page':undefined" @click="navigate(item.id)"><MdIcon :name="item.icon"/><span>{{text(item.zh,item.en)}}</span></button>
+   <div class="nav-bottom"><button @click="navigate('startup')" :class="{'boot-enabled':startup?.state==='enabled'}"><MdIcon name="power"/><span>{{startupLabel(startup)}}</span></button><small>HomeServer · v{{currentVersion}}</small></div>
+  </nav>
+  <div class="workspace">
   <div v-if="updateWaiting" role="status" class="warning">{{text('正在下载、校验或安装新版，服务恢复后页面会自动刷新。','Downloading, verifying or installing. This page will refresh when the service returns.')}}</div><div v-if="updateOutcome" role="status" class="warning">{{updateOutcome==='success'?text('更新完成，请重新登录。','Update complete; sign in again.'):text('更新未成功，请检查日志；若已替换程序，将尝试恢复旧版本。','Update unsuccessful. Check logs; rollback is attempted if the binary was replaced.')}}</div>
   <div v-if="error" role="alert" class="warning">{{error}}</div>
   <section v-if="!token" class="login">
+   <div class="login-symbol"><MdIcon name="fan"/></div>
    <h2>{{needsSetup?text('欢迎使用 · 创建管理员','Welcome · Create administrator'):text('管理员登录','Administrator login')}}</h2>
    <p v-if="needsSetup">{{text('首次使用只需设置管理员密码。初始化成功后立即登录，后续使用同一密码。','Set your administrator password on first use. Sign in immediately after setup; reuse this password later.')}}</p>
    <div v-if="needsSetup&&!setupAllowed" class="warning">{{text('当前远程连接不允许初始化。请用 SSH 隧道访问回环监听地址，或在受信任的局域网启动时添加 --allow-remote-setup。初始化之前请勿公开端口。','Remote setup is blocked. Use an SSH tunnel to a loopback listener or add --allow-remote-setup on a trusted LAN. Do not expose the port before setup.')}}</div>
@@ -144,13 +163,12 @@ onBeforeUnmount(()=>clearInterval(timer))
    </form>
   </section>
   <template v-else>
-   <nav><button v-for="[id,zh,en] in [['monitor','监控','Monitor'],['servers','服务器 / 策略','Servers / policies'],['plugins','插件','Plugins'],['history','历史','History'],['events','事件','Events'],['updates','软件更新','Updates'],['startup','启动管理','Startup']]" :key="id" :class="{active:tab===id}" @click="tab=id">{{text(zh,en)}}</button></nav>
-   <p><button @click="tab='startup'" :class="startup?.state==='enabled'?'ok':'muted'">{{startupLabel(startup)}}</button></p>
    <p class="warning">{{text('安全提示：Local IPMI 仍只读；iMana 200 SSH 实验调速需显式启用，建议在现场监督下测试。','Safety: Local IPMI remains read-only. Experimental iMana SSH fan control requires opt-in and supervised testing.')}}</p>
    <section v-if="tab==='monitor'">
     <div class="line section-head"><div><h2>{{text('实时监控','Live monitoring')}}</h2><small>{{text('每 5 秒刷新 · 实际能力取决于连接及模式','Refreshes every 5 seconds · capabilities depend on transport and mode')}}</small></div><button class="primary" @click="reset();tab='servers'">{{text('+ 添加服务器','+ Add server')}}</button></div>
-    <div class="toolbar"><input v-model="sensorFilter" :placeholder="text('搜索传感器名称','Search sensor name')"><label class="check"><input v-model="showRaw" type="checkbox">{{text('显示原始读数','Show raw readings')}}</label></div>
-    <p v-if="!dash?.instances.length">{{text('尚未添加服务器。请点击添加服务器，选择硬件和连接方式。','No servers configured. Add a server and select its hardware and transport.')}}</p>
+    <div class="overview-grid"><div class="overview-tile"><MdIcon name="dns"/><small>{{text('服务器','Servers')}}</small><strong>{{dash?.instances.length??0}}</strong></div><div class="overview-tile"><MdIcon name="monitor"/><small>{{text('在线设备','Online devices')}}</small><strong>{{onlineCount}}</strong></div><div class="overview-tile"><MdIcon name="fan"/><small>{{text('已确认控制','Confirmed control')}}</small><strong>{{controlCount}}</strong></div></div>
+    <div class="toolbar"><div class="search-field"><MdIcon name="search"/><input v-model="sensorFilter" :aria-label="text('搜索传感器名称','Search sensor name')" :placeholder="text('搜索传感器名称','Search sensor name')"></div><label class="check"><input v-model="showRaw" type="checkbox">{{text('显示原始读数','Show raw readings')}}</label></div>
+    <article v-if="!dash?.instances.length" class="empty-state"><MdIcon name="dns"/><p>{{text('尚未添加服务器。请点击添加服务器，选择硬件和连接方式。','No servers configured. Add a server and select its hardware and transport.')}}</p></article>
     <article v-for="i in dash?.instances" :key="i.id" class="server-card">
      <div class="line"><div><h3>{{i.name}}</h3><small>{{i.transport}} · {{i.mode}} · {{modeHelp(i.mode)}}</small></div><div class="actions"><span :class="i.live.online?'status-good':'status-muted'">{{i.live.online?text('在线','Online'):text('离线','Offline')}}</span><button v-if="i.mode!=='ADAPTIVE'&&i.enabled&&i.live.online&&i.live.capability?.controlEligible&&i.live.sample?.health==='ok'&&i.live.sample?.fanMode==='AUTO'" class="primary" @click="startControl(i)">{{text('启用真实调速','Enable real fan control')}}</button><button v-if="i.mode==='ADAPTIVE'" class="fault" @click="stopControl(i)">{{text('停止控制 / AUTO','Stop control / AUTO')}}</button><button @click="edit(i)">{{text('配置','Configure')}}</button></div></div>
      <p v-if="i.live.error" class="warning">{{i.live.error}}</p>
@@ -232,10 +250,7 @@ onBeforeUnmount(()=>clearInterval(timer))
    </section>
    <section v-if="tab==='events'"><h2>{{text('事件记录','Events')}}</h2><article v-for="e in dash?.events" :key="e.id"><small>{{new Date(e.at).toLocaleString()}}</small><p>{{e.message}}</p></article></section>
   </template>
+  </div>
  </main>
 </template>
-<style>
-*{box-sizing:border-box}body{margin:0;font:15px/1.6 system-ui,sans-serif}main{min-height:100vh;background:#f4f5f7;color:#17212b;padding:clamp(16px,4vw,48px);--surface:#fff;--border:#dce1e7;--sub:#617080;--accent:#185f89}main.dark{background:#13191f;color:#e1e8ef;--surface:#1d2730;--border:#354451;--sub:#b0becb;--accent:#79bde0}header,.line,.actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}header small{letter-spacing:.13em}h1,h2,h3{line-height:1.2;margin:10px 0}nav{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0}button,input,select,textarea{font:inherit;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:inherit}button{cursor:pointer}button.active,button[type=submit]{border-color:var(--accent);color:var(--accent)}button:disabled{opacity:.5}section{max-width:1100px;margin:auto}article,.login{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin:12px 0}.login{max-width:480px;margin:40px auto}small,.muted{color:var(--sub)}.ok{color:#25805a}.warning{border-left:4px solid #b77920;padding:10px 15px;background:var(--surface)}form{display:grid;gap:12px;max-width:700px}label{display:grid;gap:4px}.check{display:flex;align-items:center}textarea{font-family:monospace;width:100%}.sensors{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:8px}.sensor{display:grid;border:1px solid var(--border);border-radius:8px;padding:10px}.sensor strong{font-size:22px}
-
-main{max-width:none;padding:clamp(14px,3vw,36px)}header,nav,main>section,main>p,main>.warning{max-width:1440px;margin-left:auto;margin-right:auto}main>.login{max-width:520px}nav{padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-top:20px;margin-bottom:16px}nav button{border-color:transparent}nav button.active,.primary{background:var(--accent);color:var(--surface);border-color:var(--accent);font-weight:600}main.dark .primary,main.dark nav button.active{color:#13202a}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}section{max-width:1440px}form{max-width:none}form h4{margin:12px 0 0;border-bottom:1px solid var(--border);padding-bottom:6px}.section-head{margin:20px 0}.toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:12px 0}.toolbar input:not([type=checkbox]){min-width:min(100%,300px)}.status-good,.status-muted{border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:13px}.status-good{color:#25805a}.status-muted{color:var(--sub)}.sensor-group{margin:20px 0 8px;border-top:1px solid var(--border);padding-top:12px}.sensor-group h4{margin:0 0 8px}.sensor-group p{font-size:13px;margin:6px 0 12px}.sensor{min-width:0;gap:3px}.sensor strong small{font-size:12px}.sensors{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.state-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:5px 16px}.state-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;border-bottom:1px solid var(--border);padding:6px;font-size:13px}.raw{grid-column:1/-1;overflow-wrap:anywhere;font-family:monospace;white-space:pre-wrap}.fault{color:#c44d43}.help{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--sub);margin:4px 0}.field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;align-items:end}.field-grid input{width:100%;min-width:0}.policy-box{border:1px solid var(--border);border-radius:10px;padding:12px}.policy-box>*{margin-bottom:10px}summary{cursor:pointer;font-weight:600}a{color:var(--accent)}pre{white-space:pre-wrap;overflow-wrap:anywhere}.server-card{padding:clamp(12px,2vw,24px)}@media(max-width:600px){.sensors{grid-template-columns:repeat(2,minmax(0,1fr))}.state-list{grid-template-columns:1fr}.sensor strong{font-size:18px}nav{gap:3px}nav button{padding:6px 8px}article{padding:12px}}
-</style>
+<style src="./assets/material.css"></style>

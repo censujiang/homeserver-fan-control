@@ -55,7 +55,7 @@ jobs:
         with:
           name: linux-x64-release-assets
           path: dist
-      - name: Publish verified alpha release
+      - name: Publish verified release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -63,4 +63,6 @@ jobs:
           tag="v$(jq -r .version package.json)"
           if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "$tag" ]]; then echo 'Tag must match package version'; exit 1; fi
           if gh release view "$tag" >/dev/null 2>&1; then echo "Release already exists: $tag"; exit 0; fi
-          gh release create "$tag" --target "$GITHUB_SHA" --title "HomeServer Fan Control $tag" --prerelease --notes-file docs/release-notes.md dist/homeserver-fan-control-linux-x64-baseline dist/homeserver-fan-control-docker-linux-amd64.tar.gz dist/SHA256SUMS dist/install.sh
+          flags=()
+          if [[ "$tag" == *-* ]]; then flags+=(--prerelease --latest=false); else flags+=(--latest); fi
+          gh release create "$tag" --target "$GITHUB_SHA" --title "HomeServer Fan Control $tag" "${flags[@]}" --notes-file docs/release-notes.md dist/homeserver-fan-control-linux-x64-baseline dist/homeserver-fan-control-docker-linux-amd64.tar.gz dist/SHA256SUMS dist/install.sh

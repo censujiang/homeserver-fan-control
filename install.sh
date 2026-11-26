@@ -43,7 +43,7 @@ PY
 }
 # Offline selector for regression tests; no downloads or installation.
 if [[ "${1:-}" == --select-release ]]; then shift; select_release "$@"; exit; fi
-mode= channel=preview action= path= data= host= port= service= start= name=hsfc volume=hsfc-data remote_setup_ack=0
+mode= channel=stable action= path= data= host= port= service= start= name=hsfc volume=hsfc-data remote_setup_ack=0
 while (($#)); do
  case "$1" in
  --binary) mode=binary;; --docker) mode=docker;; --stable) channel=stable;; --preview) channel=preview;;
@@ -58,7 +58,7 @@ HomeServer Fan Control installer / updater
   Binary: --path FILE --data-dir DIR --host 127.0.0.1 --port 8080
           --start screen|systemd|none [--service UNIT]
   Docker: --name hsfc --volume hsfc-data --host 127.0.0.1 --port 8080
-Preview is the default (includes Alpha/Beta/RC).
+Stable is the default; --preview also includes Alpha/Beta/RC.
 Use --host 0.0.0.0 for LAN access. On first install, confirm the restricted
 network prompt (or explicitly pass --allow-remote-setup). Initialize promptly.
 Existing custom processes must be stopped first; a verified running systemd

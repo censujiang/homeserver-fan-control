@@ -1,7 +1,11 @@
-## v0.3.0-alpha.15 — Real SSH fan control
+# HomeServer Fan Control v0.3.0
 
-- Explicit ADAPTIVE mode or the Enable real fan control button activates the actual iMana SSH command path after hardware eligibility and health checks; no redundant text setting required.
-- Separate BMC-confirmed manual target from policy demand; show AUTO, blocked and suspended states.
-- Verify exact finite 30-second lease commands and readback in regression tests; attempt AUTO on failure and do not silently rearm failed writes.
-- Keep 30–100% physical target range. Do not implement fan stop or sub-30% override: observed 0%/20% attempts caused full-speed operation; cause unconfirmed.
-- Local IPMI remains read-only; real-machine end-to-end, sustained renewal and load safety remain unverified.
+首个正式发行版 / First stable software release.
+
+- Material Design 3-inspired responsive administration UI: desktop navigation drawer, mobile drawer, top app bar, semantic color tokens, overview cards, outlined inputs and sensor tiles.
+- Light/dark themes and Chinese/English preference persistence; no external CDN, fonts or extra UI dependency.
+- Real opt-in iMana 200 SSH fan control, BMC-confirmed manual targets, finite 30-second leases and AUTO recovery attempts.
+- Unified installer, standalone Linux x86_64 binary and Docker image with SHA-256 verification. Stable channel is default, preview opt-in.
+- Existing SQLite data, authentication, APIs and hardware safety gates remain unchanged.
+
+**Hardware limitations:** physical fan control remains experimental; only the recorded iMana 200 firmware/board is eligible, 30–100% targets only. Local IPMI remains read-only. Sustained physical load/lease validation is outstanding. This software release is not production qualification of cooling hardware.

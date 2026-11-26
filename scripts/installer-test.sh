@@ -47,16 +47,16 @@ esac
 cp "$HSFC_INSTALL_TEST_FIXTURE/$src" "$out"
 SH
 chmod +x "$tmp/fakebin/curl"
-PATH="$tmp/fakebin:$PATH" HSFC_INSTALL_TEST_FIXTURE="$tmp/fixture" bash install.sh --binary --install --path "$tmp/app" --data-dir "$tmp/data" --host 127.0.0.1 --port 8080 --start none
+PATH="$tmp/fakebin:$PATH" HSFC_INSTALL_TEST_FIXTURE="$tmp/fixture" bash install.sh --binary --preview --install --path "$tmp/app" --data-dir "$tmp/data" --host 127.0.0.1 --port 8080 --start none
 test "$("$tmp/app" --version)" = 0.3.0-alpha.11
 # LAN first setup with explicit opt-in must preserve the listen address and enable setup.
-PATH="$tmp/fakebin:$PATH" HSFC_INSTALL_TEST_FIXTURE="$tmp/fixture" bash install.sh --binary --install --path "$tmp/lan-app" --data-dir "$tmp/lan-data" --host 0.0.0.0 --port 9001 --start none --allow-remote-setup >"$tmp/lan-log"
+PATH="$tmp/fakebin:$PATH" HSFC_INSTALL_TEST_FIXTURE="$tmp/fixture" bash install.sh --binary --preview --install --path "$tmp/lan-app" --data-dir "$tmp/lan-data" --host 0.0.0.0 --port 9001 --start none --allow-remote-setup >"$tmp/lan-log"
 grep -q -- '--host 0.0.0.0 --port 9001' "$tmp/lan-log"
 grep -q -- '--allow-remote-setup' "$tmp/lan-log"
 test "$("$tmp/lan-app" --version)" = 0.3.0-alpha.11
 # A tampered artifact must never be installed.
 printf 'corrupt' >"$tmp/fixture/$asset"
-if PATH="$tmp/fakebin:$PATH" HSFC_INSTALL_TEST_FIXTURE="$tmp/fixture" bash install.sh --binary --install --path "$tmp/bad-app" --data-dir "$tmp/bad-data" --host 127.0.0.1 --port 8080 --start none; then
+if PATH="$tmp/fakebin:$PATH" HSFC_INSTALL_TEST_FIXTURE="$tmp/fixture" bash install.sh --binary --preview --install --path "$tmp/bad-app" --data-dir "$tmp/bad-data" --host 127.0.0.1 --port 8080 --start none; then
  echo 'Tampered artifact accepted' >&2; exit 1
 fi
 test ! -e "$tmp/bad-app"
