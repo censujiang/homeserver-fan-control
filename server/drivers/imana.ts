@@ -67,7 +67,7 @@ class Shell {
       try{c.connect({host:cfg.host,port:cfg.port,username:cfg.username,password:cfg.password,privateKey:cfg.privateKey,tryKeyboard:!!cfg.password,readyTimeout:cfg.timeout,keepaliveInterval:10000,keepaliveCountMax:2,
         // Prefer modern defaults, but iMana is a legacy appliance. Only append
         // 2048-bit group14 SHA1; never add group1 or bypass host verification.
-        algorithms:{kex:{append:['diffie-hellman-group14-sha1']}},
+        algorithms:{kex:{append:['diffie-hellman-group14-sha1'],prepend:[],remove:[]}},
         hostVerifier:(key:Buffer)=>{
           const expected=Buffer.from(cfg.fingerprint.replace(/=+$/,'')),actual=Buffer.from('SHA256:'+createHash('sha256').update(key).digest('base64').replace(/=+$/,''))
           const ok=expected.length===actual.length&&timingSafeEqual(expected,actual);mismatch=!ok;return ok
