@@ -5,6 +5,8 @@ Usage: homeserver-fan-control [options]
       --data-dir <path>  Persistent data directory (default ./data)
   -h, --help            Show help
       --version         Show installed version
+      --autostart-status [options]   Inspect boot startup
+      --enable-autostart [options]  Enable user systemd service (no immediate start)
       --check-update [--stable|--preview]  Check GitHub releases
       --update [--stable|--preview]        Replace standalone executable (stop service first)
 CLI options override NITRO_PORT/PORT, NITRO_HOST/HOST and HSFC_DATA_DIR.

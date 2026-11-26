@@ -21,10 +21,10 @@
 
 ### 快速开始：独立二进制（推荐 Linux 裸金属 / 物理机）
 
-在 Linux x86_64 物理机上复制以下命令即可下载、校验并启动（需要 curl 和 sha256sum）。当前示例使用公开版本 v0.3.0-alpha.2，其他版本请查看 [Releases](https://github.com/censujiang/homeserver-fan-control/releases)。建议优先在被管理的裸金属 Linux 服务器运行；虚拟机或其他主机也可使用兼容的远程插件。
+在 Linux x86_64 物理机上复制以下命令即可下载、校验并启动（需要 curl 和 sha256sum）。当前示例使用公开版本 v0.3.0-alpha.3，其他版本请查看 [Releases](https://github.com/censujiang/homeserver-fan-control/releases)。建议优先在被管理的裸金属 Linux 服务器运行；虚拟机或其他主机也可使用兼容的远程插件。
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.2
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.3
 curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
@@ -66,7 +66,7 @@ PORT=18080 ./homeserver-fan-control-linux-x64-baseline
 复制以下命令下载发行镜像、校验并导入：
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.2
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.3
 curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
@@ -108,6 +108,10 @@ docker compose logs -f
 - [内置插件目录](docs/plugins/builtin/README.md)
 - [Huawei iMana 200](docs/plugins/builtin/huawei-imana-200.md#简体中文)
 - Mock：无需硬件，适合演示及模拟测试。
+
+### 开机自启动
+
+Web 后台「启动管理」显示已设置、未设置或未知。普通非 root 二进制及生产源码运行可在 systemd 用户管理器可用时一键启用（不立即启动第二个进程），权限不足时复制宿主机命令。Docker 显示未知并给出重启策略设置提示。参见[开机自启动指南](docs/autostart.md)。
 
 ### systemd / 长期运行
 
@@ -162,7 +166,7 @@ bash scripts/docker-smoke.sh
 
 生产构建后还可以运行 `bun run start -- --port 8080` 或 `bun scripts/entry.ts --port 8080`。
 开发服务器可直接使用 `bun --bun nuxt dev --host 127.0.0.1 --port 8080`。
-GitHub Actions 验证 Nuxt 构建、单文件独立运行和 Docker 容器；版本发行附带校验文件。查看 [插件 SDK](docs/plugin-sdk.md)、[开发及安全验收状态](docs/refactor-status.md)。外置插件隔离尚未验收，不要启用不可信代码。
+GitHub Actions 验证 Nuxt 构建、单文件独立运行和 Docker 容器；版本发行附带校验文件。查看 [外部插件快速接入（推荐智能体阅读）](docs/plugins/external/quick-start.md)、[插件 SDK](docs/plugin-sdk.md)、[开发及安全验收状态](docs/refactor-status.md)。外置插件隔离尚未验收，不要启用不可信代码。
 
 ---
 
@@ -182,10 +186,10 @@ HomeServer Fan Control is an open-source cooling-management project for home ser
 
 ### Quick start: standalone executable (recommended on bare-metal Linux / physical machines)
 
-Copy these commands on a Linux x86_64 machine to download, verify and start the application (requires curl and sha256sum). The example uses public release v0.3.0-alpha.2; see [Releases](https://github.com/censujiang/homeserver-fan-control/releases) for other versions. Prefer the managed bare-metal Linux server; VMs and other hosts can also use compatible remote plugins.
+Copy these commands on a Linux x86_64 machine to download, verify and start the application (requires curl and sha256sum). The example uses public release v0.3.0-alpha.3; see [Releases](https://github.com/censujiang/homeserver-fan-control/releases) for other versions. Prefer the managed bare-metal Linux server; VMs and other hosts can also use compatible remote plugins.
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.2
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.3
 curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
@@ -224,7 +228,7 @@ Use a firewall and an HTTPS reverse proxy before exposing the service beyond loo
 **Option A: load the published image archive.** Copy the following commands to download, verify and load the release image.
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.2
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.3
 curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
@@ -264,6 +268,10 @@ Choose the plugin for your hardware. See its dedicated guide for connection sett
 - [Built-in plugin directory](docs/plugins/builtin/README.md)
 - [Huawei iMana 200](docs/plugins/builtin/huawei-imana-200.md#english)
 - Mock: no hardware required; intended for demonstrations and simulation.
+
+### Boot startup
+
+The Startup page reports enabled, disabled or unknown. Non-root standalone and production source deployments can enable a systemd user service when available, without starting a duplicate process. If permission is missing, copy the host commands. Docker reports unknown and provides restart-policy instructions. See the [startup guide](docs/autostart.md).
 
 ### systemd
 
@@ -315,7 +323,7 @@ bash scripts/docker-smoke.sh
 After a production build, use `bun run start -- --port 8080` or `bun scripts/entry.ts --port 8080`.
 For development: `bun --bun nuxt dev --host 127.0.0.1 --port 8080`.
 CI builds and verifies the standalone executable and Docker image before publishing checksummed assets.
-See the [plugin SDK](docs/plugin-sdk.md) and [implementation status and safety gates](docs/refactor-status.md).
+See the [external plugin quick start (agent-friendly)](docs/plugins/external/quick-start.md), [plugin SDK](docs/plugin-sdk.md) and [implementation status and safety gates](docs/refactor-status.md).
 Do not enable unverified third-party code.
 
 ## License

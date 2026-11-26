@@ -1,10 +1,10 @@
-## v0.3.0-alpha.2 — Online updates / 在线更新
+## v0.3.0-alpha.3 — Startup management and plugin onboarding / 启动管理与插件接入
 
-- Web software update page: stable/preview channels, GitHub Release discovery, download progress and SHA-256 verification.
-- Standalone CLI --version, --check-update, --update; atomic replacement with .previous backup and manual restart.
-- Docker-aware asset selection; load the new image on the host and recreate with the same data volume.
-- Improved curl quick-start and separate built-in hardware plugin documentation.
+- Web boot startup status, user systemd setup and copyable host commands.
+- CLI --autostart-status and --enable-autostart; preserves current host, port and data path without immediate duplicate start.
+- Docker restart-policy guidance; no Docker socket access.
+- Agent-friendly external plugin onboarding: local/SSH read-only discovery, fixtures, SDK constraints and ZIP example.
 
-公开 Alpha 发行。真实硬件风扇写入仍被禁用，外置插件隔离尚待实机验证；保留原厂 AUTO。更新不会自动重启或修改正在运行的程序。请在停止服务、备份数据后执行 CLI 更新。
+公开 Alpha：真实硬件写入仍禁用；外置插件隔离仍待验证，不能直接访问网络或宿主机硬件。systemd 一键设置取决于实际宿主机用户管理器及 linger 授权；无权限时手动配置。保留原厂 AUTO。
 
-Public alpha; physical fan writes remain disabled and external plugin isolation needs validation. Keep factory cooling in AUTO. Stop the service and back up data before applying updates. See docs/updates.md.
+Public alpha: physical writes remain disabled; external sandbox does not allow direct hardware/network access. One-click systemd setup depends on host user manager and linger permissions. Keep factory AUTO.

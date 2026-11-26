@@ -15,6 +15,7 @@ token=$(docker exec "$name" cat /data/setup-token)
 curl -fsS -H 'Content-Type: application/json' -d "{\"token\":\"$token\",\"password\":\"docker-test-password\"}" http://127.0.0.1:18767/api/auth/setup
 session=$(curl -fsS -H 'Content-Type: application/json' -d '{"password":"docker-test-password"}' http://127.0.0.1:18767/api/auth/login | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
 curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18767/api/update/status | python3 -c 'import sys,json;assert json.load(sys.stdin)["deployment"]=="docker"'
+curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18767/api/autostart/status | python3 -c 'import sys,json;x=json.load(sys.stdin);assert x["state"]=="unknown" and x["manager"]=="docker" and not x["canEnable"]'
 docker rm -f "$name"
 docker run -d --name "$name" -p 127.0.0.1:18767:3000 -v "$vol:/data" "$image"
 for i in $(seq 1 40); do if curl -fsS http://127.0.0.1:18767/api/auth/status >/tmp/hsfc-status.json; then break; fi; sleep 1; done

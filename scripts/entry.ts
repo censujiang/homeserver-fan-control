@@ -15,14 +15,28 @@ if(process.argv.includes('--plugin-worker')){
  const {currentVersion}=await import('../shared/release');console.log(currentVersion)
 }else{
  if(process.env.HSFC_DEPLOYMENT!=='docker')process.env.HSFC_DEPLOYMENT=Bun.main.includes('/$bunfs/')||import.meta.path.includes('/$bunfs/')?'binary':'source'
+ if(process.env.HSFC_DEPLOYMENT==='source'){
+  const {resolve}=await import('node:path')
+  process.env.HSFC_STARTUP_ENTRY=resolve(process.argv[1]??'scripts/entry.ts')
+ }
+ const startupAction=['--enable-autostart','--autostart-status'].includes(process.argv[2]??'')?process.argv[2]:undefined
  const {parseArgs,help}=await import('./cli')
  try{
-  const cfg=parseArgs(process.argv.slice(2),process.env)
+  const cfg=parseArgs(process.argv.slice(startupAction?3:2),process.env)
   if(cfg.help){console.log(help);process.exit(0)}
   process.env.NITRO_HOST=cfg.host
   process.env.NITRO_PORT=String(cfg.port)
   process.env.HSFC_DATA_DIR=cfg.dataDir
  }catch(e){console.error((e as Error).message);console.error(help);process.exit(2)}
- // @ts-expect-error Nitro output is generated during production build.
- await import('../.output/server/index.mjs')
+ if(startupAction){
+  const {autostartStatus,enableAutostart}=await import('../server/core/autostart')
+  try{
+   const s=startupAction==='--enable-autostart'?await enableAutostart():await autostartStatus()
+   console.log(JSON.stringify(s,null,2))
+   if(startupAction==='--enable-autostart'&&s.state!=='enabled')process.exitCode=1
+  }catch(e){console.error((e as Error).message);process.exitCode=1}
+ }else{
+  // @ts-expect-error Nitro output is generated during production build.
+  await import('../.output/server/index.mjs')
+ }
 }

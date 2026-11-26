@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AutostartStatus } from './shared/autostart'
 import { type UpdateStatus, type Channel, releasePage } from './shared/release'
 import { defaultPolicy, type Manifest, type Instance, type Policy } from './shared/model'
 type PublicInstance=Omit<Instance,'config'> & {configuredFields:string[];live:{online:boolean;error?:string;sample?:{at:number;identity:string|null;health:string;fanMode?:string;fanLevel?:number;sensors:{id:string;name:string;kind:string;value:number|null;unit:string;health:string}[]};capability?:{reason:string};decision?:{target:number|null;reason:string}}}
@@ -13,6 +14,31 @@ async function updateAction(check:boolean){updateBusy.value=true;updateError.val
  else if(update.value?.latest)update.value=await $fetch<UpdateStatus>('/api/update/download',{method:'POST',headers:auth(),body:{tag:update.value.latest.tag}})
  }catch{updateError.value=text('更新操作失败，请检查 GitHub 连接或稍后重试。','Update failed; check GitHub connectivity or try again later.')}finally{updateBusy.value=false}}
 watch(tab,async v=>{if(v==='updates'){await refreshUpdate();channel.value=update.value?.channel??'preview'}})
+const startup=ref<AutostartStatus>(),startupBusy=ref(false),startupError=ref(''),startupCopied=ref(false)
+const startupLabel=(s?:AutostartStatus)=>s?.state==='enabled'?text('已设置开机自启','Enabled at boot'):s?.state==='disabled'?text('未设置开机自启','Not enabled at boot'):text('开机自启状态未知','Boot startup unknown')
+const startupReason=(s:AutostartStatus)=>{
+ const reasons:Record<string,[string,string]>={
+ docker_host_required:['容器无法可靠检测宿主机的 Docker 重启策略。请在宿主机设置。','The container cannot reliably inspect the host restart policy. Configure it on the Docker host.'],
+ managed_enabled:['已确认当前 systemd 服务永久启用。','The current systemd service is persistently enabled.'],
+ managed_not_confirmed:['当前服务的永久自启未确认，请检查服务启用状态及 linger。','Persistent startup is not confirmed; check service enablement and linger.'],
+ enabled_next_boot:['用户服务已启用且 linger 已开启；当前程序仍继续运行，下次启动时生效。','User service and linger are enabled; the current process continues, with startup at next boot.'],
+ not_detected:['未检测到本程序对应的用户 systemd 自启单元；其他启动管理器无法判断。','No matching user systemd boot unit detected; other startup managers cannot be verified.'],
+ user_linger_or_enable_required:['用户服务尚未确认开机启动；需永久启用并开启 linger。','The user service needs persistent enablement and linger.'],
+ user_manager_unavailable:['用户 systemd 管理器不可用，请在宿主机登录会话中执行命令。','The user systemd manager is unavailable; run the commands in a host login session.'],
+ root_manual_required:['当前以 root 直接运行。请按文档迁移至非 root systemd 服务，再启用。','Running directly as root. Follow the guide to migrate to a non-root systemd service.'],
+ systemd_unavailable:['未检测到 systemd，无法可靠设置自启。','systemd was not detected; automatic startup cannot be configured reliably.'],
+ launch_unknown:['未识别受支持的生产启动入口，请使用发行二进制或 bun scripts/entry.ts。','Production launch entry not recognized; use the release executable or bun scripts/entry.ts.'],
+ unit_conflict:['同名服务配置不匹配，不会自动覆盖。请在宿主机核查。','An existing unit differs; it will not be overwritten. Inspect it on the host.'],
+ enable_failed:['启用失败，请复制命令在宿主机执行。','Enable failed; copy the commands and run them on the host.'],
+ linger_or_permission_required:['服务启用或 linger 未确认，可能需要宿主机管理员授权。','Enablement or linger is unconfirmed; host administrator authorization may be required.']
+ }
+ const v=reasons[s.reason];return v?text(v[0],v[1]):s.reason
+}
+async function refreshStartup(){if(!token.value)return;startupBusy.value=true;startupError.value='';try{startup.value=await $fetch<AutostartStatus>('/api/autostart/status',{headers:auth()})}catch{startupError.value=text('检测失败，请重试。','Detection failed; please retry.')}finally{startupBusy.value=false}}
+async function enableStartup(){if(!confirm(text('启用开机自启动？不会立即启动第二个实例或重启当前程序。','Enable boot startup? This will not start a second instance or restart the current process.')))return;startupBusy.value=true;startupError.value='';try{startup.value=await $fetch<AutostartStatus>('/api/autostart/enable',{method:'POST',headers:auth()})}catch{startupError.value=text('启用失败，请使用宿主机命令。','Enable failed; use host commands.')}finally{startupBusy.value=false}}
+async function copyStartup(){try{await navigator.clipboard.writeText(startup.value?.commands.join('\n')??'');startupCopied.value=true}catch{startupCopied.value=false}}
+watch(token,v=>{if(v)void refreshStartup();else startup.value=undefined})
+watch(tab,v=>{if(v==='startup')void refreshStartup()})
 const installedPlugins=ref<Manifest[]>([])
 const uploadFile=ref<File>()
 async function listPlugins(){installedPlugins.value=await $fetch<Manifest[]>('/api/plugins',{headers:auth()})}
@@ -60,7 +86,8 @@ onBeforeUnmount(()=>clearInterval(timer))
   <div v-if="error" role="alert" class="warning">{{error}}</div>
   <section v-if="!token" class="login"><h2>{{needsSetup?text('初始化管理员','Initialize administrator'):text('管理员登录','Administrator login')}}</h2><form @submit.prevent="signIn"><label v-if="needsSetup">{{text('数据目录 setup-token 文件中的密钥','Token from setup-token in data directory')}}<input v-model="setupToken" type="password" required></label><label>{{text('管理员密码','Password')}}<input v-model="password" type="password" required :minlength="needsSetup?12:1"></label><button :disabled="busy">{{text('继续','Continue')}}</button></form></section>
   <template v-else>
-   <nav><button v-for="[id,zh,en] in [['monitor','监控','Monitor'],['servers','服务器 / 策略','Servers / policies'],['plugins','插件','Plugins'],['history','历史','History'],['events','事件','Events'],['updates','软件更新','Updates']]" :key="id" :class="{active:tab===id}" @click="tab=id">{{text(zh,en)}}</button></nav>
+   <nav><button v-for="[id,zh,en] in [['monitor','监控','Monitor'],['servers','服务器 / 策略','Servers / policies'],['plugins','插件','Plugins'],['history','历史','History'],['events','事件','Events'],['updates','软件更新','Updates'],['startup','启动管理','Startup']]" :key="id" :class="{active:tab===id}" @click="tab=id">{{text(zh,en)}}</button></nav>
+   <p><button @click="tab='startup'" :class="startup?.state==='enabled'?'ok':'muted'">{{startupLabel(startup)}}</button></p>
    <p class="warning">{{text('安全预览：当前硬件驱动禁止写入，原厂自动散热不受影响。','Safety preview: all physical hardware writes are blocked. Factory cooling remains untouched.')}}</p>
    <section v-if="tab==='monitor'">
     <h2>{{text('实时状态','Live status')}}</h2><p v-if="!dash?.instances.length">{{text('尚未添加服务器。','No servers configured.')}}</p>
@@ -100,6 +127,24 @@ onBeforeUnmount(()=>clearInterval(timer))
      <p v-else-if="update?.deployment==='docker'">{{text('请在宿主机导入新镜像并使用原数据卷重建容器；容器不应自行替换程序。','Load the new image on the host and recreate the container with the same data volume; containers must not replace their own executable.')}}</p>
      <p v-else>{{text('源码部署请更新 Git 仓库并重新构建。','For source deployments, update the repository and rebuild.')}}</p>
      <a :href="releasePage" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
+    </article>
+   </section>
+   <section v-if="tab==='startup'">
+    <h2>{{text('开机自启动','Boot startup')}}</h2>
+    <article>
+     <div class="line"><h3 :class="startup?.state==='enabled'?'ok':'muted'">{{startupLabel(startup)}}</h3><button :disabled="startupBusy" @click="refreshStartup">{{text('重新检测','Refresh status')}}</button></div>
+     <p v-if="startupError" role="alert">{{startupError}}</p>
+     <template v-if="startup">
+      <p>{{startup.manager}} <span v-if="startup.unit">· {{startup.unit}}</span></p>
+      <p>{{startupReason(startup)}}</p>
+      <p v-if="startup.linger!==undefined">Linger: {{startup.linger?'enabled':'disabled'}}</p>
+      <button v-if="startup.canEnable" :disabled="startupBusy" @click="enableStartup">{{text('一键设置开机自启','Enable boot startup')}}</button>
+      <p v-if="startup.commands.length">{{text('如果自动设置不可用，请在宿主机执行以下命令；Docker 请替换 <container> 为实际容器名。','If automatic setup is unavailable, run these commands on the host; replace <container> with the actual Docker container name.')}}</p>
+      <pre v-if="startup.commands.length" style="white-space:pre-wrap;overflow-wrap:anywhere">{{startup.commands.join('\n')}}</pre>
+      <button v-if="startup.commands.length" @click="copyStartup">{{startupCopied?text('已复制','Copied'):text('复制命令','Copy commands')}}</button>
+      <p>{{text('不会自动重启或立即启动重复实例。','No automatic restart or immediate duplicate instance is started.')}}</p>
+      <a href="https://github.com/censujiang/homeserver-fan-control/blob/master/docs/autostart.md" target="_blank" rel="noopener noreferrer">{{text('完整启动管理指南','Full startup guide')}}</a>
+     </template>
     </article>
    </section>
    <section v-if="tab==='events'"><h2>{{text('事件记录','Events')}}</h2><article v-for="e in dash?.events" :key="e.id"><small>{{new Date(e.at).toLocaleString()}}</small><p>{{e.message}}</p></article></section>

@@ -11,4 +11,4 @@ Built-in plugins ship with the application. No ZIP upload or front-end rebuild i
 | [Huawei iMana 200](huawei-imana-200.md) | SSH / Local IPMI | 只读安全预览 / Read-only preview |
 | Mock | Virtual | 模拟控制 / Simulation |
 
-第三方插件开发 / Third-party development: [Plugin SDK](../../plugin-sdk.md).
+第三方插件开发 / Third-party development: [Plugin SDK](../../plugin-sdk.md) · [外部插件快速接入 / External plugin quick start](../external/quick-start.md).

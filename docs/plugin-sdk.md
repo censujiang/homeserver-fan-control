@@ -1,5 +1,7 @@
 # External plugin SDK (experimental)
 
+Start with the [agent-friendly external plugin quick start](plugins/external/quick-start.md), including local and SSH hardware discovery. The current external sandbox cannot directly access hardware or network.
+
 The built-in interface is in shared/model.ts. External v1 preview is a restricted read-only
 snapshot protocol: export async sample(mode, config) from index.mjs and return the Sample
 shape. ZIP manifest.json and index.mjs at archive root; optional README.md and config.schema.json.
