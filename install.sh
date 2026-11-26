@@ -43,11 +43,11 @@ PY
 }
 # Offline selector for regression tests; no downloads or installation.
 if [[ "${1:-}" == --select-release ]]; then shift; select_release "$@"; exit; fi
-mode= channel=preview action= path= data= host= port= service= start= name=hsfc volume=hsfc-data
+mode= channel=preview action= path= data= host= port= service= start= name=hsfc volume=hsfc-data remote_setup_ack=0
 while (($#)); do
  case "$1" in
  --binary) mode=binary;; --docker) mode=docker;; --stable) channel=stable;; --preview) channel=preview;;
- --install) action=install;; --update) action=update;;
+ --install) action=install;; --update) action=update;; --allow-remote-setup) remote_setup_ack=1;;
  --path|--data-dir|--host|--port|--service|--start|--name|--volume)
   (($#>=2)) || die "Missing value: $1"
   case "$1" in --path) path=$2;; --data-dir) data=$2;; --host) host=$2;; --port) port=$2;; --service) service=$2;; --start) start=$2;; --name) name=$2;; --volume) volume=$2;; esac
@@ -59,6 +59,8 @@ HomeServer Fan Control installer / updater
           --start screen|systemd|none [--service UNIT]
   Docker: --name hsfc --volume hsfc-data --host 127.0.0.1 --port 8080
 Preview is the default (includes Alpha/Beta/RC).
+Use --host 0.0.0.0 for LAN access. On first install, confirm the restricted
+network prompt (or explicitly pass --allow-remote-setup). Initialize promptly.
 Existing custom processes must be stopped first; a verified running systemd
 unit can be restarted automatically. Docker updates preserve standard
 installer/README named-volume deployments; custom/Compose deployments
@@ -224,7 +226,6 @@ PY
  [[ $host == 127.0.0.1 || $host == 0.0.0.0 ]] || die 'Supported Docker bind: 127.0.0.1 or 0.0.0.0.'
 fi
 if [[ -z $service ]]; then
- if ((!existing)) && [[ $host != 127.0.0.1 ]]; then die 'First installation must bind loopback; configure LAN access after administrator setup.'; fi
  [[ $port =~ ^[0-9]{1,5}$ ]] && ((10#$port>=1 && 10#$port<=65535)) || die 'Invalid port.'
  [[ $host == 127.0.0.1 || $host == 0.0.0.0 ]] || die 'Supported bind: 127.0.0.1 or 0.0.0.0.'
 fi
@@ -247,7 +248,14 @@ read -r tag size <<<"$selection"
 asset=$binary; [[ $mode == binary ]] || asset=$archive
 printf 'Mode: %s / %s\nInstalled: %s\nSelected: %s\n' "$mode" "$action" "${current:-none}" "$tag"
 if ((existing)); then confirm '已停止真实 ADAPTIVE 调速并确认 BMC AUTO，继续更新？ / Physical control stopped and BMC AUTO confirmed?'; fi
-if [[ $host == 0.0.0.0 ]]; then confirm '已限制管理端口访问且不向公网暴露？ / Confirm restricted management network?'; fi
+if [[ $host == 0.0.0.0 ]]; then
+ if ((!existing)); then
+  echo '警告：首次初始化前，任何能访问此端口的人均可能抢先创建管理员。仅允许可信管理设备访问，勿开放公网。 / Restrict access to trusted administrators before initial setup.'
+  if ((!remote_setup_ack)); then confirm '已限制管理端口访问，允许局域网首次初始化？ / Allow first setup on the restricted LAN?'; fi
+ else
+  confirm '已限制管理端口访问且不向公网暴露？ / Confirm restricted management network?'
+ fi
+fi
 base="https://github.com/$repo/releases/download/$tag"
 get -sS "$base/SHA256SUMS" -o "$tmp/SHA256SUMS"
 get "$base/$asset" -o "$tmp/$asset"
@@ -309,6 +317,15 @@ if [[ $mode == binary ]]; then
  else
   mkdir -p -- "$data"
   args=(--host "$host" --port "$port" --data-dir "$data")
+  # The application rejects remote initialization unless explicitly opted in.
+  # Older releases used a setup key and do not support this flag.
+  lan_setup=0
+  if ((!existing)) && [[ $host == 0.0.0.0 ]]; then
+   if "$path" --help | grep -q -- '--allow-remote-setup'; then
+    lan_setup=1
+    args+=(--allow-remote-setup)
+   fi
+  fi
   case "$start" in
    none) printf 'Start: '; printf '%q ' "$path" "${args[@]}"; printf '\n';;
    screen)
@@ -318,9 +335,19 @@ if [[ $mode == binary ]]; then
    systemd)
     "$path" --generate-autostart-script "${args[@]}"
     sh "$data/setup-autostart.sh"
-    systemctl start homeserver-fan-control.service;;
+    # The generated persistent unit deliberately excludes setup permission.
+    # For fresh LAN installation grant it through a boot-scoped drop-in.
+    if ((lan_setup)); then
+     dropin=/run/systemd/system/homeserver-fan-control.service.d/90-hsfc-first-setup.conf
+     mkdir -p -- "$(dirname "$dropin")"
+     (set -o noclobber; printf '[Service]\nEnvironment=HSFC_ALLOW_REMOTE_SETUP=1\n' > "$dropin") || die 'Existing first-setup drop-in; inspect it before starting.'
+     systemctl daemon-reload
+    fi
+    systemctl start homeserver-fan-control.service
+    if ((lan_setup)); then echo "After creating the administrator, remove $dropin and run systemctl daemon-reload. The permission also expires on reboot."; fi;;
   esac
-  echo "Web: http://$host:$port (use SSH tunnel for loopback)."
+  if [[ $host == 0.0.0.0 ]]; then echo "Web: http://SERVER_LAN_IP:$port"; else echo "Web: http://$host:$port"; fi
+  if ((lan_setup)) && [[ $start != systemd ]]; then echo 'After creating the administrator, omit --allow-remote-setup on future launches.'; fi
   if [[ $host == 127.0.0.1 ]]; then echo "SSH tunnel: ssh -L $port:127.0.0.1:$port USER@SERVER"; fi
  fi
 else
@@ -339,10 +366,9 @@ else
   # Prevent the retired container from being started at next boot.
   if ! docker update --restart no "$backup_name" >/dev/null; then docker rename "$backup_name" "$name"; ((running==0)) || docker start "$name"; die 'Cannot disable old restart policy'; fi
  fi
- # First setup uses loopback only; do not leave remote setup enabled for updates.
+ # First setup supports loopback and explicitly confirmed LAN binding.
  extra=()
  if ((!existing)); then
-  [[ $host == 127.0.0.1 ]] || die 'New Docker setup must bind loopback; expose LAN only after initialization.'
   extra=(-e HSFC_ALLOW_REMOTE_SETUP=1)
  fi
  ok=0
@@ -359,7 +385,8 @@ else
   die 'Container failed startup; previous container restored if available. Check data backup.'
  fi
  if ((existing)); then echo "Previous stopped container: $backup_name; data backup: $backup_data"; fi
- echo "Web: http://$host:$port"
+ if [[ $host == 0.0.0.0 ]]; then echo "Web: http://SERVER_LAN_IP:$port"; else echo "Web: http://$host:$port"; fi
+ if ((!existing)); then echo "After initial setup, remove HSFC_ALLOW_REMOTE_SETUP=1 on the next container recreation; keep the same volume."; fi
 fi
 echo "Installed $tag. Data is preserved. / 安装或更新完成。"
-if ((!existing)); then echo "Open the loopback Web UI to initialize the administrator (alpha.5 and older require the setup-token file)."; fi
+if ((!existing)); then echo "Open the Web UI to initialize the administrator promptly (alpha.5 and older require the setup-token file)."; fi

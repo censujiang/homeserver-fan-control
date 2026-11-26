@@ -20,7 +20,7 @@ bash install.sh --help | grep -q -- '--docker'
 # systemd, Docker, or a public GitHub request.
 mkdir -p "$tmp/fakebin" "$tmp/fixture"
 asset=homeserver-fan-control-linux-x64-baseline
-printf '%s\n' '#!/bin/sh' 'if [ "$1" = --version ]; then echo 0.3.0-alpha.11; exit 0; fi' 'exit 1' >"$tmp/fixture/$asset"
+printf '%s\n' '#!/bin/sh' 'if [ "$1" = --version ]; then echo 0.3.0-alpha.11; exit 0; fi' 'if [ "$1" = --help ]; then echo --allow-remote-setup; exit 0; fi' 'exit 1' >"$tmp/fixture/$asset"
 (cd "$tmp/fixture" && sha256sum "$asset" > SHA256SUMS)
 python3 - "$tmp/fixture" "$asset" <<'PY'
 import json,sys,pathlib
@@ -49,6 +49,11 @@ SH
 chmod +x "$tmp/fakebin/curl"
 PATH="$tmp/fakebin:$PATH" HSFC_INSTALL_TEST_FIXTURE="$tmp/fixture" bash install.sh --binary --install --path "$tmp/app" --data-dir "$tmp/data" --host 127.0.0.1 --port 8080 --start none
 test "$("$tmp/app" --version)" = 0.3.0-alpha.11
+# LAN first setup with explicit opt-in must preserve the listen address and enable setup.
+PATH="$tmp/fakebin:$PATH" HSFC_INSTALL_TEST_FIXTURE="$tmp/fixture" bash install.sh --binary --install --path "$tmp/lan-app" --data-dir "$tmp/lan-data" --host 0.0.0.0 --port 9001 --start none --allow-remote-setup >"$tmp/lan-log"
+grep -q -- '--host 0.0.0.0 --port 9001' "$tmp/lan-log"
+grep -q -- '--allow-remote-setup' "$tmp/lan-log"
+test "$("$tmp/lan-app" --version)" = 0.3.0-alpha.11
 # A tampered artifact must never be installed.
 printf 'corrupt' >"$tmp/fixture/$asset"
 if PATH="$tmp/fakebin:$PATH" HSFC_INSTALL_TEST_FIXTURE="$tmp/fixture" bash install.sh --binary --install --path "$tmp/bad-app" --data-dir "$tmp/bad-data" --host 127.0.0.1 --port 8080 --start none; then

@@ -10,7 +10,7 @@
 curl -fL --retry 2 https://raw.githubusercontent.com/censujiang/homeserver-fan-control/master/install.sh -o install.sh && bash install.sh
 ```
 
-请先阅读脚本。默认预览通道，支持 --stable；按 SemVer 排序并检查分页附件。独立程序保留原数据目录，已核验运行中的 systemd 服务可自动重启；Screen/前台需先停止。标准 Docker 容器保留数据卷及端口，备份旧容器；特殊配置使用原部署定义。更新前确认 BMC AUTO，回滚仅恢复旧二进制或容器，数据库不兼容时需要手工恢复冷备份。详见 README 和 bash install.sh --help。
+请先阅读脚本。默认预览通道，支持 --stable；按 SemVer 排序并检查分页附件。独立程序保留原数据目录，已核验运行中的 systemd 服务可自动重启；Screen/前台需先停止。标准 Docker 容器保留数据卷及端口，备份旧容器；特殊配置使用原部署定义。更新前确认 BMC AUTO，回滚仅恢复旧二进制或容器，数据库不兼容时需要手工恢复冷备份。首次安装可选择 0.0.0.0，确认可信管理网络后脚本启用远程首次初始化；systemd 使用 /run 下的临时 drop-in，Screen 使用 --allow-remote-setup，Docker 首次创建使用环境变量。初始化后移除临时授权。详见 README 和 bash install.sh --help。
 
 ### Web 管理后台
 
