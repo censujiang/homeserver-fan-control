@@ -15,7 +15,7 @@
 | SSH | 远程设备、PVE 虚拟机、容器 | BMC 管理 IP、端口、用户名、密码或私钥、已独立核验的 SHA256 主机公钥指纹 |
 | Local IPMI | 被管理服务器的物理 Linux 宿主机 | /dev/ipmi0、/usr/bin/ipmitool、访问设备的最小权限 |
 
-SSH 不依赖本地 IPMI，也不需要 root。通过可靠渠道核验主机公钥指纹，不要盲目信任首次连接的指纹。
+SSH 不依赖本地 IPMI，也不需要 root。同一 BMC 若提供 RSA、ECDSA 等多种主机密钥，可将分别独立核验的 SHA256 指纹用逗号分隔填入同一字段；不匹配时显示实际收到的指纹，仍拒绝连接。通过可靠渠道核验主机公钥指纹，不要盲目信任首次连接的指纹。
 
 本地 IPMI 示例（只读）：
 
@@ -64,7 +64,7 @@ Built-in plugin ID: `huawei.imana200`. No additional installation is needed. Add
 | SSH | Remote BMC, VM, container | BMC address, port, credentials and independently verified SHA256 host-key fingerprint |
 | Local IPMI | Physical Linux host | /dev/ipmi0, /usr/bin/ipmitool, restricted device access |
 
-SSH does not require local IPMI or root. Verify the fingerprint via a trusted channel, not merely the first SSH connection.
+SSH does not require local IPMI or root. For a BMC with multiple host keys, enter independently verified SHA256 fingerprints separated by commas. Mismatches display the observed fingerprint and still reject the connection. Verify the fingerprint via a trusted channel, not merely the first SSH connection.
 
 For read-only local IPMI, check `ipmitool -I open mc info` and `ipmitool -I open sensor list`. In Docker, explicitly map the device and its numeric group:
 
