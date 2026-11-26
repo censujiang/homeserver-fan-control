@@ -1,26 +1,26 @@
 # HomeServer Fan Control
 
-Experimental offline adaptive thermal controller for Huawei iMana 200, compatible with Node.js 22+ and Bun. No dependencies. MIT licensed.
+Nuxt / Nitro / Vue SPA / Bun / SQLite refactor — **read-only alpha**, not production-ready.
+This preview deliberately cannot enter physical ADAPTIVE mode or send fan writes.
+MIT license. Existing offline prototype remains in src/ and test/ as reference only.
 
-```sh
-npm test
-npm start
-# or
-bun src/main.mjs
-```
+## Development
+Install Bun 1.3.x, then run bun install, bun run dev, bun run test, bun run typecheck and bun run lint.
+Open http://127.0.0.1:3000, read the setup-token from HSFC_DATA_DIR (default ./data),
+and initialize a password of at least 12 characters. Use a local browser or SSH port forwarding.
+Do not expose plain HTTP to untrusted networks. Use HTTPS through an authenticated reverse proxy.
+The SQLite database and its encryption key must be backed up together while the service is stopped.
+For a systemd deployment use the service template and install script; grant the service user only
+the required local IPMI device permission, never run the web process as root.
 
-The first alpha parses iMana sensor tables and simulates cooling decisions. It does not connect to BMC or write fan settings. All included values and thresholds are **synthetic simulation examples**, not validated safe hardware limits. The signed DTS is not an absolute temperature; the exact interpretation must be verified for each platform.
+## Connections
+* Local IPMI requires /dev/ipmi0 and /usr/bin/ipmitool. No SSH credentials needed.
+* SSH uses a persistent shell and an independently verified SHA256 host-key fingerprint;
+  never copy a fingerprint from an untrusted first connection.
+* Mock supports dry-run with the example CPU/fan IDs, without touching hardware.
 
-## Safety roadmap
-
-- Read-only polling and model/firmware detection.
-- Baseline automatic-mode fan RPM and temperatures under representative loads.
-- Account for unmonitored DIMMs, RAID, disks, NIC and GPU using independent telemetry.
-- Verify firmware minimum and physically test a short, nonzero manual-mode timeout before enabling writes. Never command zero fan speed.
-- Confirm command results and RPM readback; return to BMC automatic control on missing telemetry, fan faults, overheating, or shutdown. Never use a permanent manual-mode timeout.
-
-Reference: Huawei Server iMana 200 User Guide, sections 3.10–3.11, describes fanlevel and fanmode. A manual-mode lease can be requested using `ipmcset -d fanmode -v 1 60`; exact firmware behavior requires validation. Automatic mode is `ipmcset -d fanmode -v 0`.
-
-## 中文
-
-面向家庭服务器的静音温控。首版只解析 iMana 200 的传感器并模拟风扇决策。升温快速升速、降温延迟逐步降速、异常返回自动模式。暂不接入米家和睡眠数据。禁止停转，不将示例转速视为安全值。实际写入功能尚未实现。
+## Build
+Run bun run build, then bun run compile. The target is Linux x64 baseline.
+CI tests a copied executable outside the checkout. Build success and compatibility are not claimed
+until CI passes and the executable has been tested on the target Xeon E5-2640 v2.
+See docs/refactor-status.md for known gaps and safety acceptance gates.

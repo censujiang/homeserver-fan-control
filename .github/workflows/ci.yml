@@ -1,0 +1,27 @@
+name: Build and verify
+on:
+  push:
+    branches: ['master', 'refactor/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.13'
+      - run: bun install
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run test
+      - run: bun run build
+      - run: bun run compile
+      - run: bash scripts/smoke.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64-baseline-preview
+          path: dist/homeserver-fan-control
