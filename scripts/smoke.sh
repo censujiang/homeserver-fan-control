@@ -18,12 +18,12 @@ while read -r asset; do curl -fsS "http://127.0.0.1:18765$asset" >/dev/null; don
 test -f data/database.sqlite
 ./app --help | grep -q -- --port
 if ./app --port 65536; then echo "Invalid port accepted"; exit 1; fi
-token=$(cat data/setup-token)
-test "$(curl -s -o bad-token.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"token":"too-long-invalid-token-with-terminal-prompt-0123456789012345678901234567890","password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 400
-test "$(curl -s -o bad-password.json -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"token\":\"$token\",\"password\":\"short\"}" http://127.0.0.1:18765/api/auth/setup)" = 400
-test "$(curl -s -o wrong-token.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"token":"0000000000000000000000000000000000000000000000000000000000000000","password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 403
-test "$(curl -s -o bad-login.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:18765/api/auth/login)" = 400
-curl -fsS -H 'Content-Type: application/json' -d "{\"token\":\"  $token  \",\"password\":\"test-password-1234\"}" http://127.0.0.1:18765/api/auth/setup
+test ! -e data/setup-token
+test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: evil.example' -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 403
+test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Origin: http://evil.example' -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 403
+test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"password":"short"}' http://127.0.0.1:18765/api/auth/setup)" = 400
+curl -fsS -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup
+test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"password":"another-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 409
 session=$(curl -fsS -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/login | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
 curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18765/api/dashboard | grep -q huawei.imana200
 test "$(./app --version)" = "$version"

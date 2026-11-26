@@ -1,10 +1,11 @@
-## v0.3.0-alpha.5 — Administrator setup validation / 管理员初始化修复
+## v0.3.0-alpha.6 — Usability and first-run setup / 易用性与初始化
 
-- Trim leading/trailing setup-token whitespace and require exactly 64 hexadecimal characters.
-- Return HTTP 400 for invalid setup/login input instead of uncaught Zod errors (HTTP 500).
-- Provide bilingual setup instructions and actionable validation errors in the Web UI.
-- Add HTTP regression tests for malformed token, short password, incorrect token, invalid login and whitespace-tolerant initialization.
-- Retain Bun 1.4.5 and Ivy Bridge compatibility gate.
+- Password-only administrator setup: no manual setup key; default loopback-only, explicit temporary opt-in for trusted LAN or Docker setup. Existing administrator and data remain unchanged.
+- Grouped monitoring dashboard with search, collapsed discrete events, raw readings, translated health and normalized sensor units.
+- Actual iMana discrete bitmaps remain unknown until vendor-specific event meanings are verified, rather than falsely marked as faults.
+- Form-based optional simulation policy editor, advanced JSON, connection/mode explanations and links.
+- Screen instructions for SSH disconnect and systemd guidance.
+- Bun 1.4.5 and legacy CPU CI gate retained.
 
-保留现有数据目录；不需要重新初始化已创建的管理员。真实风扇写入仍未开放。
-Keep the existing data directory; already initialized administrators do not need to set up again. Physical fan writes remain disabled.
+真实硬件写入仍禁用，原厂 AUTO 不受影响。首次初始化前不要向不可信网络暴露端口；已初始化用户无需重新设置密码。
+Physical writes remain disabled. Keep factory AUTO. Do not expose an uninitialized server to untrusted networks; existing administrators do not need to set up again.

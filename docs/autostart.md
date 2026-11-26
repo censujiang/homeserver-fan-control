@@ -4,6 +4,19 @@
 
 Web 后台「启动管理」展示已设置、未设置或未知，检测当前 systemd 服务 MainPID 与永久启用状态；用户服务还检查 linger。未找到匹配服务不等于不存在 cron、其他 init 或厂商启动任务。Docker 容器不能可靠获取宿主机的重启策略，因此显示未知。
 
+### SSH 断开后继续运行（Screen）
+
+先停止当前前台进程（Ctrl+C），在原目录使用原运行用户执行：
+
+```sh
+sudo apt-get install -y screen
+screen -dmS hsfc ./homeserver-fan-control-linux-x64-baseline --port 8080 --data-dir ./data
+screen -ls
+screen -r hsfc
+```
+
+Ctrl+A 后 D 分离会话。Screen 通常可跨 SSH 断线持续运行，但不能跨系统重启；部分系统登录会话回收策略也可能终止它，长期运行优先 systemd。不要重复启动相同数据目录。按实际配置调整端口和目录。alpha.6 首次本机或 SSH 隧道初始化只需密码；直接局域网首次初始化需临时添加 --host 0.0.0.0 --allow-remote-setup，并限制访问，完成后移除该选项。
+
 ### 非 root 独立二进制 / 生产源码
 
 若 Linux systemd 用户管理器可用，点击「一键设置开机自启」。程序只写当前用户的专属 unit，并保留当前可执行路径、工作目录、监听地址、端口、绝对数据目录。以数据目录哈希区分实例，不覆盖同名不同配置的 unit，不会立即启动第二个进程。用户服务需要 linger 才能在未登录时开机启动；如果系统需要管理员授权，使用页面复制的命令：
@@ -46,6 +59,8 @@ sudo systemctl enable docker
 ## English
 
 The Startup page reports enabled, disabled or unknown. It checks the current systemd MainPID and persistent enablement; user services also require linger. Missing matching units do not rule out cron or other service managers. Docker reports unknown because the container cannot reliably inspect the host restart policy.
+
+For temporary background operation, stop any existing process, install Screen and run `screen -dmS hsfc ./homeserver-fan-control-linux-x64-baseline --port 8080 --data-dir ./data` from the original directory. Use `screen -ls`, `screen -r hsfc` and Ctrl+A then D to detach. Screen normally survives SSH disconnect but not reboot; systemd is preferred for long-term operation. Some session cleanup policies may terminate Screen. For alpha.6+, password-only first setup is allowed on loopback or via an SSH tunnel; trusted LAN setup requires the temporary --allow-remote-setup option, restricted access and removal after setup.
 
 For a non-root standalone binary or production source deployment, enable startup in the Web UI when a user systemd manager is available. The generated user unit preserves executable, working directory, host, port and absolute data directory, has a per-data-directory identifier, refuses conflicts and does not start a second process. Linger may require host authorization; run the copied commands in the same user's login session, using the original deployment directory and parameters.
 

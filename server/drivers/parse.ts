@@ -10,9 +10,13 @@ export function parseSensors(text:string,at=Date.now()):Sensor[]{
     else if(/^RPM$/i.test(unit))kind='rpm'
     else if(/watts|^W$/i.test(unit))kind='power'
     else if(/percent|^%$/i.test(unit))kind='percent'
-    const n=/^-?\d+(?:\.\d+)?$/.test(value)?Number(value):null
-    const health=/^ok$/i.test(status)?'ok':/^(ns|na|unknown|disabled|nr)$/i.test(status)?'unknown':'fault'
-    out.push({id:name,name,kind,value:n,unit,raw:line,valid:n!==null&&health==='ok',health,at})
+    const hex=kind==='discrete'&&/^0x[0-9a-f]+$/i.test(value)
+    const n=hex?Number.parseInt(value,16):/^-?\d+(?:\.\d+)?$/.test(value)?Number(value):null
+    // IPMI discrete values are event bitmaps, not generic error flags. Without SDR
+    // event definitions neither a nonzero bitmap nor 0x0080 establishes health.
+    const health=kind==='discrete'&&(/^0x[0-9a-f]+$/i.test(status)||hex)?'unknown':/^ok$/i.test(status)?'ok':/^(nc|cr|nr|lnc|lcr|lnr|unc|ucr|unr|fault|fail|critical|non-critical|non-recoverable)$/i.test(status)?'fault':'unknown'
+    const normalizedUnit=kind==='thermal-margin'?'°C (DTS)':kind==='temperature'?'°C':kind==='power'?'W':unit
+    out.push({id:name,name,kind,value:n,unit:normalizedUnit,raw:line,valid:n!==null&&health==='ok',health,at})
   }
   return out
 }

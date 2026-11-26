@@ -13,7 +13,7 @@
 
 ### 功能
 
-- Web 管理后台：服务器管理、实时传感器状态、温控策略 JSON、历史采样、异常事件、中英文及亮暗主题。
+- Web 管理后台：服务器管理、实时传感器状态、表单式温控策略（可选高级 JSON）、历史采样、异常事件、中英文及亮暗主题。
 - 内置与外置硬件插件，支持按插件选择连接方式。参见[内置插件目录](docs/plugins/builtin/README.md)。
 - SQLite WAL 持久化、管理员密码哈希、连接配置加密。
 - 外置 ZIP 插件安装、校验及管理；隔离执行是实验功能，默认关闭。
@@ -27,21 +27,27 @@
 
 ```sh
 BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
-curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
-curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
+curl -fL --connect-timeout 15 --retry 3 "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
+curl -fL --connect-timeout 15 --max-time 60 --retry 3 "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
 chmod +x homeserver-fan-control-linux-x64-baseline && \
 ./homeserver-fan-control-linux-x64-baseline --port 8080
 ```
 
 默认只监听 127.0.0.1:3000。上例为 127.0.0.1:8080，无需安装 Bun、Node.js 或 npm。
-初次运行在数据目录（默认 `./data`）创建 `setup-token`。在第二个终端以同一运行用户读取：
+从 alpha.6 起，首次打开页面直接设置并确认管理员密码（12～128 字符），无需 setup key。默认只允许回环监听上的本机初始化；远程服务器可用 `ssh -L 8080:127.0.0.1:8080 user@server` 建立隧道，再打开 http://127.0.0.1:8080。旧版 alpha.5 及以前仍需要密钥（`cat ./data/setup-token; echo`）。
+
+**SSH 断开后继续运行（Debian/Ubuntu/PVE）：** 先停止当前前台程序（Ctrl+C），不要重复启动同一数据目录。
 
 ```sh
-cat ./data/setup-token
+sudo apt-get install -y screen
+screen -dmS hsfc ./homeserver-fan-control-linux-x64-baseline --port 8080 --data-dir ./data
+screen -ls
 ```
 
-打开 http://127.0.0.1:8080（远程服务器可先运行 `ssh -L 8080:127.0.0.1:8080 user@server` 建立隧道），输入初始化密钥并设置至少 12 字符的密码。初始化完成后密钥文件会被删除。
+使用 `screen -r hsfc` 重新连接，按 Ctrl+A 然后 D 分离；SSH 断开不会通常终止 Screen 会话，但宿主机重启不会自动恢复。长期使用推荐 systemd。
+
+如果是在可信局域网首次直接访问（先限制防火墙访问，仅允许管理员；不对公网开放），可临时使用 `--host 0.0.0.0 --allow-remote-setup` 启动，设置密码后移除初始化选项再启动。
 
 ### 启动参数与环境变量
 
@@ -50,6 +56,7 @@ cat ./data/setup-token
 | `-p` / `--port` | `NITRO_PORT` / `PORT` | 3000 |
 | `-H` / `--host` | `NITRO_HOST` / `HOST` | 127.0.0.1 |
 | `--data-dir` | `HSFC_DATA_DIR` | ./data |
+| `--allow-remote-setup` | `HSFC_ALLOW_REMOTE_SETUP=1` | off / 关闭 |
 | `-h` / `--help` | — | 显示帮助 |
 
 命令行优先于环境变量，端口必须为 1–65535 的整数。普通用户监听 1024 以下端口可能需要额外权限。
@@ -69,23 +76,22 @@ PORT=18080 ./homeserver-fan-control-linux-x64-baseline
 
 ```sh
 BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
-curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
-curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
+curl -fL --connect-timeout 15 --retry 3 "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
+curl -fL --connect-timeout 15 --max-time 60 --retry 3 "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
 docker load -i homeserver-fan-control-docker-linux-amd64.tar.gz && \
 docker run -d --name hsfc --restart unless-stopped \
   -p 127.0.0.1:8080:3000 \
-  -v hsfc-data:/data \
+  -v hsfc-data:/data -e HSFC_ALLOW_REMOTE_SETUP=1 \
   --security-opt no-new-privileges:true \
   homeserver-fan-control:ci
-docker exec hsfc cat /data/setup-token
 ```
 
-宿主机访问 8080，容器内部监听 3000。也支持直接改变容器内部端口：
+宿主机访问 8080，容器内部监听 3000。首次通过回环映射进入页面创建管理员（alpha.6 起）；环境变量 HSFC_ALLOW_REMOTE_SETUP=1 仅用于初次设置，完成后建议重建容器移除变量并保留数据卷。也支持直接改变容器内部端口：
 
 ```sh
 docker run -d --name hsfc-custom \
-  -p 127.0.0.1:18080:9000 -v hsfc-custom-data:/data \
+  -p 127.0.0.1:18080:9000 -v hsfc-custom-data:/data -e HSFC_ALLOW_REMOTE_SETUP=1 \
   homeserver-fan-control:ci --port 9000
 ```
 
@@ -96,8 +102,7 @@ docker run -d --name hsfc-custom \
 ```sh
 git clone https://github.com/censujiang/homeserver-fan-control.git
 cd homeserver-fan-control
-HSFC_HOST_PORT=8080 docker compose up -d --build
-docker compose exec fan-control cat /data/setup-token
+HSFC_ALLOW_REMOTE_SETUP=1 HSFC_HOST_PORT=8080 docker compose up -d --build
 docker compose logs -f
 ```
 
@@ -123,7 +128,6 @@ Web 后台「启动管理」显示已设置、未设置或未知。普通非 roo
 sudo bash deploy/install.sh ./homeserver-fan-control-linux-x64-baseline
 sudo systemctl status homeserver-fan-control
 sudo journalctl -u homeserver-fan-control -f
-sudo cat /var/lib/homeserver-fan-control/setup-token
 ```
 
 通过 `sudo systemctl edit homeserver-fan-control` 添加覆盖配置：
@@ -150,7 +154,7 @@ Environment=NITRO_HOST=127.0.0.1
 
 ### 数据管理及升级
 
-数据目录包含 database.sqlite、config.key、插件及初始化密钥（初始化前）。备份前停止进程或容器，完整备份数据目录（包括 SQLite WAL/SHM 如存在）；恢复时保留同一加密密钥及文件所有权。数据包含敏感信息，备份需受保护。更新时停止旧程序，替换二进制或镜像，重新启动；保留数据目录或 Docker 数据卷。卸载程序不等同于删除数据。
+数据目录包含 database.sqlite、config.key、插件（旧版本还可能包含初始化密钥）。备份前停止进程或容器，完整备份数据目录（包括 SQLite WAL/SHM 如存在）；恢复时保留同一加密密钥及文件所有权。数据包含敏感信息，备份需受保护。更新时停止旧程序，替换二进制或镜像，重新启动；保留数据目录或 Docker 数据卷。卸载程序不等同于删除数据。
 
 ### 开发与构建
 
@@ -180,7 +184,7 @@ HomeServer Fan Control is an open-source cooling-management project for home ser
 
 ### Features
 
-- Web dashboard: instance management, current sensors, JSON policies, history and events; English/Chinese and dark/light themes.
+- Web dashboard: instance management, current sensors, form-based policies (optional advanced JSON), history and events; English/Chinese and dark/light themes.
 - Built-in and external hardware plugins with selectable transports. See the [built-in plugin directory](docs/plugins/builtin/README.md).
 - SQLite WAL persistence, hashed administrator password and encrypted connection settings.
 - Validated ZIP plugin installation and management; isolated execution is experimental and disabled by default.
@@ -194,20 +198,24 @@ Copy these commands on a Linux x86_64 machine to download, verify and start the 
 
 ```sh
 BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
-curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
-curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
+curl -fL --connect-timeout 15 --retry 3 "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
+curl -fL --connect-timeout 15 --max-time 60 --retry 3 "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
 chmod +x homeserver-fan-control-linux-x64-baseline && \
 ./homeserver-fan-control-linux-x64-baseline --port 8080
 ```
 
-In a second terminal (as the same user):
+From alpha.6, open http://127.0.0.1:8080 and create/confirm an administrator password (12–128 characters); no setup key is required. Use `ssh -L 8080:127.0.0.1:8080 user@server` for remote access. Alpha.5 and older require the legacy key (`cat ./data/setup-token; echo`). No separate Bun or Node.js installation is required.
+
+**Keep running after SSH disconnect (Debian/Ubuntu/PVE):** stop any existing foreground process first.
 
 ```sh
-cat ./data/setup-token
+sudo apt-get install -y screen
+screen -dmS hsfc ./homeserver-fan-control-linux-x64-baseline --port 8080 --data-dir ./data
+screen -ls
 ```
 
-No Bun, Node.js, npm or separate front-end assets are required. The default binding is 127.0.0.1:3000; this example uses port 8080. Read the first-run setup token and open http://127.0.0.1:8080. For a remote server, first use `ssh -L 8080:127.0.0.1:8080 user@server`. Choose an administrator password of at least 12 characters. The setup token is removed after initialization.
+Use `screen -r hsfc` to attach and Ctrl+A then D to detach. Screen normally survives SSH disconnect but not reboot; use systemd for long-term operation. For first-time direct LAN access, restrict network access to the administrator and temporarily add `--host 0.0.0.0 --allow-remote-setup`. Remove the setup option after creating the administrator.
 
 ### Command-line options and environment variables
 
@@ -216,6 +224,7 @@ No Bun, Node.js, npm or separate front-end assets are required. The default bind
 | `-p` / `--port` | `NITRO_PORT` / `PORT` | 3000 |
 | `-H` / `--host` | `NITRO_HOST` / `HOST` | 127.0.0.1 |
 | `--data-dir` | `HSFC_DATA_DIR` | ./data |
+| `--allow-remote-setup` | `HSFC_ALLOW_REMOTE_SETUP=1` | off / 关闭 |
 | `-h` / `--help` | — | Help |
 
 CLI options override environment variables. Ports must be integers between 1 and 65535. Low ports may require extra OS permissions.
@@ -233,21 +242,20 @@ Use a firewall and an HTTPS reverse proxy before exposing the service beyond loo
 
 ```sh
 BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
-curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
-curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
+curl -fL --connect-timeout 15 --retry 3 "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
+curl -fL --connect-timeout 15 --max-time 60 --retry 3 "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
 docker load -i homeserver-fan-control-docker-linux-amd64.tar.gz && \
 docker run -d --name hsfc --restart unless-stopped \
-  -p 127.0.0.1:8080:3000 -v hsfc-data:/data \
+  -p 127.0.0.1:8080:3000 -v hsfc-data:/data -e HSFC_ALLOW_REMOTE_SETUP=1 \
   --security-opt no-new-privileges:true homeserver-fan-control:ci
-docker exec hsfc cat /data/setup-token
 ```
 
-The host port is 8080; the container port is 3000. To change the internal port as well:
+The host port is 8080; the container port is 3000. For alpha.6+, create the administrator via the loopback-published UI. HSFC_ALLOW_REMOTE_SETUP=1 is only for first setup; recreate the container without it after setup, keeping the data volume. To change the internal port as well:
 
 ```sh
 docker run -d --name hsfc-custom \
-  -p 127.0.0.1:18080:9000 -v hsfc-custom-data:/data \
+  -p 127.0.0.1:18080:9000 -v hsfc-custom-data:/data -e HSFC_ALLOW_REMOTE_SETUP=1 \
   homeserver-fan-control:ci --port 9000
 ```
 
@@ -258,8 +266,7 @@ The container binds 0.0.0.0 internally and runs as UID/GID 10001, not root. For 
 ```sh
 git clone https://github.com/censujiang/homeserver-fan-control.git
 cd homeserver-fan-control
-HSFC_HOST_PORT=8080 docker compose up -d --build
-docker compose exec fan-control cat /data/setup-token
+HSFC_ALLOW_REMOTE_SETUP=1 HSFC_HOST_PORT=8080 docker compose up -d --build
 docker compose logs -f
 ```
 
@@ -283,7 +290,6 @@ The Startup page reports enabled, disabled or unknown. Non-root standalone and p
 sudo bash deploy/install.sh ./homeserver-fan-control-linux-x64-baseline
 sudo systemctl status homeserver-fan-control
 sudo journalctl -u homeserver-fan-control -f
-sudo cat /var/lib/homeserver-fan-control/setup-token
 ```
 
 Change settings via `sudo systemctl edit homeserver-fan-control`:

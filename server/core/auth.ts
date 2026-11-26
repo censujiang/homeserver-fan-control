@@ -1,23 +1,33 @@
 import { randomBytes, createHash } from 'node:crypto'
 import { database, setting, setSetting, dataDir } from './db'
 import { join } from 'node:path'
-import { writeFileSync, readFileSync, unlinkSync } from 'node:fs'
-import { createError, getHeader, type H3Event } from 'h3'
+import { unlinkSync } from 'node:fs'
+import { createError, getHeader, getRequestIP, type H3Event } from 'h3'
 const sessions=new Map<string,number>()
 const hash=(s:string)=>createHash('sha256').update(s).digest('hex')
 export function setupRequired(){database();return !setting('admin')}
-function setupToken(){
- const p=join(dataDir,'setup-token')
- try{writeFileSync(p,randomBytes(32).toString('hex'),{flag:'wx',mode:0o600})}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e}
- return readFileSync(p,'utf8').trim()
+export function initializeAuth(){database()}
+function loopback(ip:string|undefined){return !!ip&&(/^(?:127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+)$/.test(ip))}
+export function setupAllowed(e:H3Event){
+ const host=getHeader(e,'host')??'',origin=getHeader(e,'origin')
+ // No proxy-forwarded IP trust. Browser origins must match the request host.
+ if(origin){try{const u=new URL(origin);if(u.host!==host||!['http:','https:'].includes(u.protocol))return false}catch{return false}}
+ if(getHeader(e,'sec-fetch-site')==='cross-site')return false
+ if(process.env.HSFC_ALLOW_REMOTE_SETUP==='1')return true
+ const bind=process.env.NITRO_HOST??process.env.HOST??'127.0.0.1'
+ return loopback(bind)&&loopback(getRequestIP(e,{xForwardedFor:false}))&&/^(?:localhost|127\.\d+\.\d+\.\d+|\[::1\])(?::\d+)?$/i.test(host)
 }
-export function initializeAuth(){if(setupRequired())setupToken()}
-export async function setup(token:string,password:string){
- if(!setupRequired()||hash(token)!==hash(setupToken()))throw createError({statusCode:403,statusMessage:'Setup denied'})
- const passwordHash=await Bun.password.hash(password)
- if(!setupRequired())throw createError({statusCode:409,statusMessage:'Already initialized'})
- setSetting('admin',passwordHash)
- unlinkSync(join(dataDir,'setup-token'))
+let initializing=false
+export async function setup(password:string){
+ if(!setupRequired()||initializing)throw createError({statusCode:409,statusMessage:'Already initialized or setup in progress'})
+ initializing=true
+ try{
+  const passwordHash=await Bun.password.hash(password)
+  if(!setupRequired())throw createError({statusCode:409,statusMessage:'Already initialized'})
+  setSetting('admin',passwordHash)
+  // Clean up a legacy token only after committing the password.
+  try{unlinkSync(join(dataDir,'setup-token'))}catch{/* absent or legacy file could not be removed; never used for authentication */}
+ }finally{initializing=false}
 }
 let nextLogin=0
 export async function login(password:string){

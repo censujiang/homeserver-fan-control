@@ -17,7 +17,8 @@ done
 test "$ready" = 1
 grep -q '"setup":true' status.json
 test -f data/database.sqlite
-test -s data/setup-token
+test ! -e data/setup-token
+curl -fsS -H 'Content-Type: application/json' -d '{"password":"legacy-test-password"}' http://127.0.0.1:18768/api/auth/setup
 curl -fsS http://127.0.0.1:18768/ >index.html
 grep -q '/_nuxt/' index.html
 echo "Ivy Bridge emulated startup, SQLite initialization and HTTP passed"

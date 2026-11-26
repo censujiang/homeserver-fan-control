@@ -27,6 +27,7 @@ if(process.argv.includes('--plugin-worker')){
   process.env.NITRO_HOST=cfg.host
   process.env.NITRO_PORT=String(cfg.port)
   process.env.HSFC_DATA_DIR=cfg.dataDir
+  process.env.HSFC_ALLOW_REMOTE_SETUP=cfg.allowRemoteSetup?'1':'0'
  }catch(e){console.error((e as Error).message);console.error(help);process.exit(2)}
  if(startupAction){
   const {autostartStatus,enableAutostart}=await import('../server/core/autostart')
