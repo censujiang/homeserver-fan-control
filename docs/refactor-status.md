@@ -6,7 +6,7 @@ Implemented in source: Nuxt SPA, Nitro lifecycle monitor, SQLite WAL and first m
 encrypted connection configuration, administrator setup and login, instance CRUD, plugin
 interface and registry, schema-driven connection form, history and events, dry-run engine,
 read-only local IPMI and SSH shell, mock driver, baseline compile and smoke-test workflow,
-systemd unit. No physical hardware write is possible via the API or the drivers. The mock driver can exercise the finite-lease control executor and readback checks.
+systemd unit. The initial implementation was read-only. Current releases implement opt-in real iMana 200 SSH control using a 30-second hardware lease and readback; Local IPMI remains read-only. Mock covers the executor; hardware integration and sustained load validation are still outstanding.
 
 Unverified / incomplete:
 - Exact iMana SSH prompt, output parsing, BMC identity and health status need real captures.

@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto'
+import {ControlError} from '../core/control-error'
 import {parseSensors} from './parse'
 import type {Sample,Policy} from '../../shared/model'
 export const imanaFans=Array.from({length:4},(_,n)=>['F','R'].map(side=>'FAN'+(n+1)+' '+side+' Speed')).flat()
@@ -35,5 +36,22 @@ export function guardedSample(text:string,at:number,identity:string|null,health:
 }
 export function validateManualReply(text:string,expected?:number){
  const s=fanState(text)
- if(s.fanMode!=='MANUAL'||s.remaining===undefined||s.remaining<1||s.remaining>30||(expected!==undefined&&s.fanLevel!==expected))throw new Error('Timed fan-mode readback mismatch')
+ if(s.fanMode!=='MANUAL'||s.remaining===undefined||s.remaining<1||s.remaining>30||(expected!==undefined&&s.fanLevel!==expected))throw new ControlError('Timed fan-mode readback mismatch')
+}
+
+/** Real BMC commands: injected transport permits a regression test of the exact
+ * command sequence without touching hardware. Never accept 0% or an infinite lease. */
+export async function writeTimedFan(run:(command:string)=>Promise<string>,percent:number){
+ if(!Number.isInteger(percent)||percent<30||percent>100)throw new ControlError('Unsupported physical fan target (30–100%)')
+ const m=await run('ipmcset -d fanmode -v 1 30')
+ if(!/Set fan mode successfully[.!]?/i.test(m))throw new ControlError('BMC rejected manual mode')
+ validateManualReply(m)
+ const l=await run('ipmcset -d fanlevel -v '+percent)
+ if(!/Set fan level successfully[.!]?/i.test(l))throw new ControlError('BMC rejected requested fan level')
+ validateManualReply(l,percent)
+ validateManualReply(await run('ipmcget -d fanlevel'),percent)
+}
+export async function restoreFactoryAuto(run:(command:string)=>Promise<string>){
+ const result=await run('ipmcset -d fanmode -v 0')
+ if(!/Set fan mode successfully[.!]?/i.test(result)||fanState(await run('ipmcget -d fanmode')).fanMode!=='AUTO')throw new ControlError('BMC AUTO readback failed')
 }

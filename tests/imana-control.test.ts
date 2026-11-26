@@ -1,5 +1,5 @@
 import {test,expect} from 'bun:test'
-import {fanState,validateManualReply,identityFromSerial,firmwareSupported,healthOK,guardedSample,imanaFans,imanaPolicy} from '../server/drivers/imana-control'
+import {fanState,validateManualReply,identityFromSerial,firmwareSupported,healthOK,guardedSample,imanaFans,imanaPolicy,writeTimedFan,restoreFactoryAuto} from '../server/drivers/imana-control'
 import {defaultPolicy} from '../shared/model'
 import {decide} from '../server/core/engine'
 test('recorded iMana 7.38 replies and strict timeout/readback',()=>{
@@ -29,4 +29,21 @@ test('physical safety policy mandates all rotors and both CPUs/inlet',()=>{
  expect(decide({...sample,health:'unknown'},p,undefined,1000).target).toBeNull()
  expect(guardedSample(rows.slice(0,-1).join('\n'),1000,'id',true,'Current mode: auto.').health).toBe('unknown')
  expect(decide(guardedSample(rows.join('\n').replace('-46','-20'),1000,'id',true,'Current mode: auto.'),p,undefined,1000).target).toBeNull()
+})
+
+test('real command sequence uses a finite lease, exact readback, and AUTO restoration',async()=>{
+ const calls:string[]=[]
+ const manual='Current Mode: manual, timeout 30 seconds.\r\nManual Fan Level: 40%\r\n'
+ const run=async(command:string)=>{calls.push(command);if(command==='ipmcset -d fanmode -v 1 30')return 'Set fan mode successfully.\r\n'+manual
+ if(command==='ipmcset -d fanlevel -v 40')return 'Set fan level successfully.\r\n'+manual
+ if(command==='ipmcget -d fanlevel')return manual
+ if(command==='ipmcset -d fanmode -v 0')return 'Set fan mode successfully.'
+ return 'Current mode: auto'}
+ await writeTimedFan(run,40)
+ await restoreFactoryAuto(run)
+ expect(calls).toEqual(['ipmcset -d fanmode -v 1 30','ipmcset -d fanlevel -v 40','ipmcget -d fanlevel','ipmcset -d fanmode -v 0','ipmcget -d fanmode'])
+ const count=calls.length
+ await expect(writeTimedFan(run,0)).rejects.toThrow('Unsupported physical fan target')
+ expect(calls.length).toBe(count)
+ await expect(writeTimedFan(async()=> 'Fan level rejected',40)).rejects.toThrow('BMC rejected manual mode')
 })

@@ -2,8 +2,9 @@ import { Client, type ClientChannel } from 'ssh2'
 import { z } from 'zod'
 import type { Driver, Plugin, Sample } from '../../shared/model'
 import { parseSensors } from './parse'
+import {ControlError} from '../core/control-error'
 import {ImanaSSHError,sshFailure,imanaPrompt,parseHostPins,hostPinMatches} from './imana-ssh-errors'
-import {fanState,identityFromSerial,firmwareSupported,healthOK,guardedSample,validateManualReply} from './imana-control'
+import {fanState,identityFromSerial,firmwareSupported,healthOK,guardedSample,writeTimedFan,restoreFactoryAuto} from './imana-control'
 const localConfig=z.object({device:z.literal('/dev/ipmi0').default('/dev/ipmi0'), timeout:z.coerce.number().int().min(1000).max(20000).default(12000)})
 const sshConfig=z.object({host:z.string().trim().min(1).max(253),port:z.coerce.number().int().min(1).max(65535).default(22),username:z.string().min(1),password:z.string().optional(),privateKey:z.string().optional(),control:z.enum(['monitor','experimental']).default('monitor'),fingerprint:z.string().trim().max(512).refine(s=>{try{parseHostPins(s);return true}catch{return false}},'Enter one or more verified SHA256 fingerprints'),timeout:z.coerce.number().int().min(1000).max(20000).default(10000)}).refine(x=>Boolean(x.password)!==Boolean(x.privateKey))
 async function ipmi(args:string[],timeout:number){
@@ -81,7 +82,7 @@ const noWrite=async()=>{throw new Error('Hardware writes not validated/enabled')
 export const imana:Plugin={
  manifest:{id:'huawei.imana200',name:'Huawei iMana 200',version:'0.4.0',apiVersion:1,description:'SSH timed fan control (experimental, explicit opt-in) and Linux OpenIPMI read-only',modes:[
  {id:'local',label:'Local IPMI',fields:[{key:'device',label:'Device',type:'text',default:'/dev/ipmi0'},{key:'timeout',label:'Timeout (ms)',type:'number',default:12000}]},
- {id:'ssh',label:'SSH',fields:[{key:'host',label:'BMC address',type:'text',required:true},{key:'port',label:'Port',type:'number',default:22},{key:'username',label:'Username',type:'text',required:true},{key:'password',label:'Password',type:'password'},{key:'privateKey',label:'Private key',type:'password'},{key:'fingerprint',label:'Verified SHA256 fingerprints (comma separated)',type:'text',required:true},{key:'timeout',label:'Timeout (ms)',type:'number',default:10000},{key:'control',label:'Control: monitor / experimental',type:'text',default:'monitor'}]}]},
+ {id:'ssh',label:'SSH',fields:[{key:'host',label:'BMC address',type:'text',required:true},{key:'port',label:'Port',type:'number',default:22},{key:'username',label:'Username',type:'text',required:true},{key:'password',label:'Password',type:'password'},{key:'privateKey',label:'Private key',type:'password'},{key:'fingerprint',label:'Verified SHA256 fingerprints (comma separated)',type:'text',required:true},{key:'timeout',label:'Timeout (ms)',type:'number',default:10000}]}]},
  create(mode,raw):Driver{
    if(mode==='local'){
      const cfg=localConfig.parse(raw)
@@ -93,7 +94,8 @@ export const imana:Plugin={
    const cfg=sshConfig.parse(raw),shell=new Shell(cfg)
    let identity:string|null=null,supported=false,armed=false
    let lastSample:Sample|undefined
-   const canWrite=()=>cfg.control==='experimental'&&supported&&!!identity
+   const eligible=()=>supported&&!!identity
+   const canWrite=()=>cfg.control==='experimental'&&eligible()
    async function verify(){
     await shell.connect()
     const version=await shell.run('ipmcget -d version')
@@ -107,12 +109,11 @@ export const imana:Plugin={
     if(!armed)return
     if(!shell.connected())await verify()
     if(!canWrite())throw new Error('BMC identity not verified')
-    const result=await shell.run('ipmcset -d fanmode -v 0')
-    if(!/Set fan mode successfully[.!]?/i.test(result)||fanState(await shell.run('ipmcget -d fanmode')).fanMode!=='AUTO')throw new Error('AUTO readback failed')
+    await restoreFactoryAuto(command=>shell.run(command))
     armed=false
    }
    return {connect:verify,async identify(){return identity},
-    capabilities:()=>canWrite()?{read:true,write:true,timedFallback:true,reason:'Experimental SSH: 30-second BMC lease; requires supervised validation'}:blocked(cfg.control==='monitor'?'SSH read-only; set control to experimental to opt in':'Unsupported firmware/board or missing serial identity'),
+    capabilities:()=>canWrite()?{read:true,write:true,timedFallback:true,controlEligible:true,reason:'Real SSH control enabled: finite 30-second BMC lease'}:{...blocked(eligible()?'SSH monitoring; select ADAPTIVE to enable real fan control':'Unsupported firmware/board or missing serial identity'),controlEligible:eligible()},
     async sample():Promise<Sample>{
      if(!shell.connected())await verify()
      const at=Date.now()
@@ -127,20 +128,14 @@ export const imana:Plugin={
      return s
     },
     auto,async manual(percent,seconds){
-     if(!canWrite()||seconds!==30||!Number.isInteger(percent)||percent<30||percent>100||!lastSample||lastSample.health!=='ok'||Date.now()-lastSample.at>10000)throw new Error('SSH control safety gate')
+     if(!canWrite()||seconds!==30||!Number.isInteger(percent)||percent<30||percent>100||!lastSample||lastSample.health!=='ok'||Date.now()-lastSample.at>10000)throw new ControlError('SSH control safety gate: unsupported target, stale data or unverified hardware')
      // Do not take over existing manual mode unless this driver owns the lease.
      const before=fanState(await shell.run('ipmcget -d fanlevel'))
-     if((!armed&&before.fanMode!=='AUTO')||(armed&&(before.fanMode!=='MANUAL'||before.fanLevel!==lastSample.fanLevel||before.remaining===undefined||before.remaining<1||before.remaining>30)))throw new Error('Unexpected external fan control')
-     if(Date.now()-lastSample.at>10000)throw new Error('Stale sensor data')
+     if((!armed&&before.fanMode!=='AUTO')||(armed&&(before.fanMode!=='MANUAL'||before.fanLevel!==lastSample.fanLevel||before.remaining===undefined||before.remaining<1||before.remaining>30)))throw new ControlError('Unexpected external fan control')
+     if(Date.now()-lastSample.at>10000)throw new ControlError('Stale sensor data')
      armed=true
      try{
-      const m=await shell.run('ipmcset -d fanmode -v 1 30')
-      if(!/Set fan mode successfully[.!]?/i.test(m))throw new Error('Manual mode command rejected')
-      validateManualReply(m)
-      const l=await shell.run('ipmcset -d fanlevel -v '+percent)
-      if(!/Set fan level successfully[.!]?/i.test(l))throw new Error('Fan level command rejected')
-      validateManualReply(l,percent)
-      validateManualReply(await shell.run('ipmcget -d fanlevel'),percent)
+      await writeTimedFan(command=>shell.run(command),percent)
      }catch(e){await auto().catch(()=>{});throw e}
     },async close(){try{await auto()}finally{shell.close()}}}
 

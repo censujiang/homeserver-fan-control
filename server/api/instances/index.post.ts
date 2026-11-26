@@ -1,4 +1,5 @@
 import {installing} from '../../core/update'
+import {controlIntent} from '../../core/control-intent'
 import { authorize } from '../../core/auth'
 import { instances, saveInstance, event } from '../../core/db'
 import { plugins } from '../../core/registry'
@@ -8,7 +9,7 @@ export default defineEventHandler(async e=>{
  authorize(e)
  const p=instanceSchema.safeParse(await readBody(e))
  if(!p.success)throw createError({statusCode:400,statusMessage:'Invalid instance configuration'})
- const b=p.data
+ const b=controlIntent(p.data)
  if(b.mode==='ADAPTIVE'&&b.plugin!=='mock'&&!(b.plugin==='huawei.imana200'&&b.transport==='ssh'&&b.config.control==='experimental'))throw createError({statusCode:409,statusMessage:'Hardware write capability not validated'})
  const plugin=plugins.get(b.plugin)
  if(!plugin)throw createError({statusCode:400,statusMessage:'Unknown plugin'})

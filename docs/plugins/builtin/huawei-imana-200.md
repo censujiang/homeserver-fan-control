@@ -91,8 +91,12 @@ The documented test hardware uses iMana 200 firmware 7.38, manufacturer ID 2011,
 
 ## SSH 实验控制 / Experimental SSH control
 
-仅支持已记录的 iMana 7.38、主板 0xaa09，且须成功读取有效序列号、核验 SSH 指纹。先用 MONITOR/DRY_RUN 确认全部传感器及健康，再将 SSH 连接参数 control 设置为 experimental，选择 ADAPTIVE。仅现场有人监护时尝试；30–100% 区间中仅 30% 已实机测试，连续续期和负载安全尚未实机确认。必须检查两颗 DTS、进风温度和全部八转子。每次手动租约 30 秒，严格读回，禁止永久手动；出错停止控制并尝试 AUTO，未确认时依赖硬件已验证的超时机制。切换 MONITOR/删除/关闭时尝试恢复 AUTO。不要并行运行其他风扇控制程序或使用手动模式。默认安全阈值是保守初始值而非实机校准；可收紧，不能放宽。
+仅支持已记录的 iMana 7.38、主板 0xaa09，且须成功读取有效序列号、核验 SSH 指纹。先用 MONITOR/DRY_RUN 确认全部传感器及健康，再在已连接的设备卡片点击「启用真实调速」或选择 ADAPTIVE（不需另外设置 control）。仅现场有人监护时尝试；30% 与 100% 的 SSH 设置已实机测试；中间值、连续续期和负载安全尚未实机确认。必须检查两颗 DTS、进风温度和全部八转子。每次手动租约 30 秒，严格读回，禁止永久手动；出错停止控制并尝试 AUTO，未确认时依赖硬件已验证的超时机制。切换 MONITOR/删除/关闭时尝试恢复 AUTO。不要并行运行其他风扇控制程序或使用手动模式。默认安全阈值是保守初始值而非实机校准；可收紧，不能放宽。
 
-Only the recorded iMana 7.38 / board 0xaa09 profile with valid serial and pinned SSH key is eligible. Verify MONITOR/DRY_RUN first; explicitly set SSH control=experimental and ADAPTIVE. Supervise at the server. Only 30% has been physically tested; repeated renewal and load behavior remain unverified. Mandatory protections cover both DTS, inlet, all eight rotors. Finite 30-second leases, readback, and AUTO on failures; never permanent manual. Do not run other controllers concurrently. Switch MONITOR to stop. The conservative guard thresholds are not hardware-calibrated; users can tighten them.
+Only the recorded iMana 7.38 / board 0xaa09 profile with valid serial and pinned SSH key is eligible. Verify MONITOR/DRY_RUN first; explicitly choose ADAPTIVE or Enable real fan control on the device card. Supervise at the server. 30% and 100% SSH writes have been physically tested; intermediate targets, repeated renewal and load behavior remain unverified. Mandatory protections cover both DTS, inlet, all eight rotors. Finite 30-second leases, readback, and AUTO on failures; never permanent manual. Do not run other controllers concurrently. Switch MONITOR to stop. The conservative guard thresholds are not hardware-calibrated; users can tighten them.
 
 Local IPMI OEM control remains unverified for this legacy firmware. The modern openUBMC read-only Get Fan Mode specification uses command 0x30/0x91 with vendor prefix db 07 00 and subcommand 02; its timeout is in minutes, not the verified SSH seconds. Do not assume compatibility or use its write commands on iMana 200.
+
+低于 30% 的目标不受本驱动支持；0% 和 20% 的尝试曾出现风扇全速运转，原因尚未确定。不要尝试绕过 BMC 安全下限。界面区分策略目标与 BMC 已确认的真实目标，控制异常暂停并尝试恢复 AUTO。
+
+Targets below 30% are unsupported. Attempts at 0% and 20% were observed to cause full-speed operation; the cause remains unconfirmed. Do not bypass BMC cooling limits. The UI distinguishes the policy target from the BMC-confirmed target and suspends control with attempted AUTO recovery on failure.

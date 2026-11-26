@@ -17,7 +17,7 @@ export const defaultPolicy: Policy = policySchema.parse({})
 export type SensorKind = 'temperature'|'thermal-margin'|'power'|'rpm'|'percent'|'discrete'
 export interface Sensor { id:string; name:string; kind:SensorKind; value:number|null; unit:string; raw:string; valid:boolean; health:'ok'|'unknown'|'fault'; at:number }
 export interface Sample { at:number; identity:string|null; health:'ok'|'unknown'|'fault'; sensors:Sensor[]; fanMode?:string; fanLevel?:number; leaseRemaining?:number }
-export interface Capability { read:boolean; write:boolean; timedFallback:boolean; reason:string }
+export interface Capability { read:boolean; write:boolean; timedFallback:boolean; reason:string; controlEligible?:boolean }
 export interface Field { key:string; label:string; type:'text'|'password'|'number'; required?:boolean; default?:string|number }
 export interface Manifest { id:string; name:string; version:string; apiVersion:1; description:string; modes:{id:string;label:string;fields:Field[]}[] }
 export interface Driver {
