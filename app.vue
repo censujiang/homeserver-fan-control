@@ -87,7 +87,7 @@ function reset(){
 }
 function selectPlugin(){form.transport=manifest.value?.modes[0]?.id??'';selectTransport()}
 function selectTransport(){form.config=Object.fromEntries(fields.value.filter(f=>f.default!==undefined).map(f=>[f.key,f.default]))}
-function edit(i:PublicInstance){showEditor.value=true;advancedPolicy.value=false;policyDraft.value=structuredClone(i.policy);form.id=i.id;form.name=i.name;form.plugin=i.plugin;form.transport=i.transport;form.mode=i.mode;form.enabled=i.enabled;form.config={};form.policy=JSON.stringify(i.policy,null,2);tab.value='servers'}
+function edit(i:PublicInstance){showEditor.value=true;advancedPolicy.value=false;policyDraft.value=policySchema.parse(i.policy);form.id=i.id;form.name=i.name;form.plugin=i.plugin;form.transport=i.transport;form.mode=i.mode;form.enabled=i.enabled;form.config={};form.policy=JSON.stringify(i.policy,null,2);tab.value='servers'}
 async function save(){await action(async()=>{
  const body={name:form.name,plugin:form.plugin,transport:form.transport,mode:form.mode,enabled:form.enabled,policy:policySchema.parse(advancedPolicy.value?JSON.parse(form.policy):policyDraft.value),...(!form.id||Object.keys(form.config).length?{config:form.config}:{})}
  await $fetch(form.id?'/api/instances/'+form.id:'/api/instances',{method:form.id?'PUT':'POST',headers:auth(),body})
