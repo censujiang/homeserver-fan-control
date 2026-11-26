@@ -2,6 +2,7 @@ import { database, instances, event } from './db'
 import { plugins } from './registry'
 import { decide, type Decision } from './engine'
 import { LeaseController } from './lease'
+import { ImanaSSHError } from '../drivers/imana-ssh-errors'
 import { imanaPolicy } from '../drivers/imana-control'
 import type { Capability, Driver, Instance, Sample } from '../../shared/model'
 export interface Live { sample?:Sample; decision?:Decision; capability?:Capability; online:boolean; error?:string }
@@ -14,12 +15,14 @@ class Runner{
  private stopped=false
  private lastSave=0
  private controlFault=false
+ private retryDelay=5000
  constructor(readonly instance:Instance){}
  start(){this.schedule(0)}
- private schedule(ms:number){if(!this.stopped)this.timer=setTimeout(()=>{this.pending=this.poll().finally(()=>{this.pending=undefined;this.schedule(5000)})},ms)}
+ private schedule(ms:number){if(!this.stopped)this.timer=setTimeout(()=>{this.pending=this.poll().finally(()=>{this.pending=undefined;this.schedule(this.retryDelay)})},ms)}
  private async poll(){
   const i=this.instance
   try{
+   this.retryDelay=5000
    if(!this.driver){const plugin=plugins.get(i.plugin);if(!plugin)throw new Error('Plugin unavailable');this.driver=plugin.create(i.transport,i.config);await this.driver.connect()}
    const sample=await this.driver.sample()
    const capability=this.driver.capabilities()
@@ -35,11 +38,13 @@ class Runner{
    }
    this.live={online:true,sample,capability,decision,...(this.controlFault?{error:'Control suspended; review and re-save configuration to rearm'}:{})}
    if(Date.now()-this.lastSave>=30000){database().run('INSERT OR REPLACE INTO samples VALUES(?,?,?)',[i.id,sample.at,JSON.stringify(this.live)]);this.lastSave=Date.now()}
-  }catch{
+  }catch(e){
    if(i.mode==='ADAPTIVE'&&i.plugin!=='mock'&&this.lease)this.controlFault=true
    await this.lease?.fallback();this.lease=undefined
-   if(this.live.online||!this.live.error)event('Monitoring failed; control stopped',i.id)
-   this.live={online:false,error:'Connection or sampling failed'}
+   const message=e instanceof ImanaSSHError?e.message:'Connection or sampling failed'
+   if(e instanceof ImanaSSHError&&['authentication','fingerprint','handshake'].includes(e.code))this.retryDelay=60000
+   if(this.live.online||this.live.error!==message)event('Monitoring failed; control stopped: '+message,i.id)
+   this.live={online:false,error:message}
    await this.driver?.close().catch(()=>{});this.driver=undefined
   }
  }

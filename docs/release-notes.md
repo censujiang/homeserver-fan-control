@@ -1,9 +1,7 @@
-## v0.3.0-alpha.10 — Web self-update / 网页自更新
+## v0.3.0-alpha.11 — Legacy iMana SSH connectivity / 老款 iMana SSH 兼容性
 
-- Supervised Linux standalone process supports verified Web installation and automatic restart, including foreground, Screen and systemd launches.
-- Revalidate staged binary, check candidate version, preserve versioned executable and cold SQLite backups, replace atomically, verify restarted HTTP version, attempt binary rollback on failure.
-- Browser waits and reloads; sign in again after restart. Stop physical ADAPTIVE control before installing. No privilege escalation or Docker socket.
-- CLI uses versioned backups; older releases require one final manual transition to this supervisor-capable version.
-- Docker and source installation remain manual. Legacy CPU test continues to exercise the actual serving binary; physical updates and repeated iMana lease testing still need real-host validation.
-
-保留数据目录。自动回滚只保证尝试恢复旧二进制，数据库不兼容时需使用冷备份恢复；不要将生产系统暴露至不可信网络。
+- Enable password keyboard-interactive authentication for one non-echo password challenge.
+- Append legacy 2048-bit diffie-hellman-group14-sha1 as fallback to modern SSH algorithms; no group1 or host verification bypass.
+- Use explicit VT100 PTY, carriage return and strict iMana prompt matching.
+- Report SSH fingerprint, authentication, handshake, network, interactive-shell and sampling failures in monitoring and event history without exposing credentials; slow retries for auth/key/negotiation failures.
+- Keep physical writes opt-in; actual BMC SSH connectivity needs real-host verification.
