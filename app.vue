@@ -68,7 +68,7 @@ onBeforeUnmount(()=>clearInterval(timer))
       <label>{{text('连接方式','Transport')}}<select v-model="form.transport" @change="selectTransport"><option v-for="m in manifest?.modes" :key="m.id" :value="m.id">{{m.label}}</option></select></label>
       <p v-if="form.id">{{text('不填写连接参数则保留旧配置；如修改则完整填写。','Leave all connection fields empty to retain old config; otherwise enter complete config.')}}</p>
       <label v-for="f in fields" :key="f.key">{{f.label}}<input v-model="form.config[f.key]" :type="f.type" :required="!form.id&&f.required"></label>
-      <label>{{text('运行模式','Mode')}}<select v-model="form.mode"><option>AUTO</option><option>MONITOR</option><option>DRY_RUN</option><option disabled>ADAPTIVE</option></select></label>
+      <label>{{text('运行模式','Mode')}}<select v-model="form.mode"><option>AUTO</option><option>MONITOR</option><option>DRY_RUN</option><option :disabled="form.plugin!=='mock'">ADAPTIVE (Mock only)</option></select></label>
       <label class="check"><input v-model="form.enabled" type="checkbox">{{text('启用监控','Enable monitoring')}}</label>
       <label>{{text('策略 JSON（仅模拟，阈值须校准）','Policy JSON (simulation only; calibrate thresholds)')}}<textarea v-model="form.policy" rows="14" spellcheck="false"></textarea></label>
       <div class="actions"><button :disabled="busy">{{text('保存','Save')}}</button><button type="button" @click="reset">{{text('重置','Reset')}}</button></div>

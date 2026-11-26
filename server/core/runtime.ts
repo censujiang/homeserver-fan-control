@@ -1,11 +1,13 @@
 import { database, instances, event } from './db'
 import { plugins } from './registry'
 import { decide, type Decision } from './engine'
+import { LeaseController } from './lease'
 import type { Capability, Driver, Instance, Sample } from '../../shared/model'
 export interface Live { sample?:Sample; decision?:Decision; capability?:Capability; online:boolean; error?:string }
 class Runner{
  live:Live={online:false}
  private driver?:Driver
+ private lease?:LeaseController
  private timer?:ReturnType<typeof setTimeout>
  private pending?:Promise<void>
  private stopped=false
@@ -19,16 +21,23 @@ class Runner{
    if(!this.driver){const plugin=plugins.get(i.plugin);if(!plugin)throw new Error('Plugin unavailable');this.driver=plugin.create(i.transport,i.config);await this.driver.connect()}
    const sample=await this.driver.sample()
    const capability=this.driver.capabilities()
-   const decision= i.mode==='DRY_RUN'?decide(sample,i.policy,this.live.decision?.state):undefined
+   const decision= (i.mode==='DRY_RUN'||i.mode==='ADAPTIVE')?decide(sample,i.policy,this.live.decision?.state):undefined
+   // Real hardware is intentionally not allowed to take over in this preview.
+   if(i.mode==='ADAPTIVE'){
+    if(i.plugin!=='mock'||!capability.write||!capability.timedFallback)throw new Error('Write capability not validated')
+    this.lease??=new LeaseController(i.id,this.driver)
+    await this.lease.tick(sample,decision?.target??null)
+   }
    this.live={online:true,sample,capability,decision}
    if(Date.now()-this.lastSave>=30000){database().run('INSERT OR REPLACE INTO samples VALUES(?,?,?)',[i.id,sample.at,JSON.stringify(this.live)]);this.lastSave=Date.now()}
   }catch{
-   if(this.live.online||!this.live.error)event('Monitoring failed; no hardware writes',i.id)
+   await this.lease?.fallback();this.lease=undefined
+   if(this.live.online||!this.live.error)event('Monitoring failed; control stopped',i.id)
    this.live={online:false,error:'Connection or sampling failed'}
    await this.driver?.close().catch(()=>{});this.driver=undefined
   }
  }
- async stop(){this.stopped=true;clearTimeout(this.timer);await this.pending;await this.driver?.close();this.live={online:false}}
+ async stop(){this.stopped=true;clearTimeout(this.timer);await this.pending;await this.lease?.fallback();this.lease=undefined;await this.driver?.close();this.live={online:false}}
 }
 class Monitor{
  private runners=new Map<string,Runner>()
