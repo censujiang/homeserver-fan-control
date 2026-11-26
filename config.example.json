@@ -1,0 +1,71 @@
+{
+  "minFan": 30,
+  "sensors": [
+    {
+      "name": "CPU1 Core Rem",
+      "unit": "degrees C",
+      "min": 0,
+      "max": 110,
+      "warm": 45,
+      "hot": 65
+    },
+    {
+      "name": "CPU1 DTS",
+      "unit": "unspecified",
+      "min": -120,
+      "max": 0,
+      "warm": -35,
+      "hot": -20
+    },
+    {
+      "name": "CPU1 Prochot",
+      "unit": "degrees C",
+      "min": 0,
+      "max": 110,
+      "warm": 45,
+      "hot": 65
+    },
+    {
+      "name": "CPU2 Core Rem",
+      "unit": "degrees C",
+      "min": 0,
+      "max": 110,
+      "warm": 45,
+      "hot": 65
+    },
+    {
+      "name": "CPU2 DTS",
+      "unit": "unspecified",
+      "min": -120,
+      "max": 0,
+      "warm": -35,
+      "hot": -20
+    },
+    {
+      "name": "CPU2 Prochot",
+      "unit": "degrees C",
+      "min": 0,
+      "max": 110,
+      "warm": 45,
+      "hot": 65
+    },
+    {
+      "name": "Inlet Temp",
+      "unit": "degrees C",
+      "min": 0,
+      "max": 60,
+      "warm": 25,
+      "hot": 35
+    }
+  ],
+  "fans": [
+    "FAN1 F Speed",
+    "FAN1 R Speed",
+    "FAN2 F Speed",
+    "FAN2 R Speed",
+    "FAN3 F Speed",
+    "FAN3 R Speed",
+    "FAN4 F Speed",
+    "FAN4 R Speed"
+  ]
+}

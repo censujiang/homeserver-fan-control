@@ -1,0 +1,16 @@
+sensor name | value | unit | status
+CPU1 Core Rem | 32 | degrees C | ok
+CPU1 DTS | -60 | unspecified | ok
+CPU1 Prochot | 32 | degrees C | ok
+CPU2 Core Rem | 32 | degrees C | ok
+CPU2 DTS | -60 | unspecified | ok
+CPU2 Prochot | 32 | degrees C | ok
+Inlet Temp | 20 | degrees C | ok
+FAN1 F Speed | 2400 | RPM | ok
+FAN1 R Speed | 2400 | RPM | ok
+FAN2 F Speed | 2400 | RPM | ok
+FAN2 R Speed | 2400 | RPM | ok
+FAN3 F Speed | 2400 | RPM | ok
+FAN3 R Speed | 2400 | RPM | ok
+FAN4 F Speed | 2400 | RPM | ok
+FAN4 R Speed | 2400 | RPM | ok

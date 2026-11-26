@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {parseSensors,decide} from '../src/control.mjs';
+const cfg=JSON.parse(readFileSync(new URL('../config.example.json',import.meta.url),'utf8'));
+const f=readFileSync(new URL('../sensors.example.txt',import.meta.url),'utf8');
+const rows=parseSensors(f);
+test('signed DTS',()=>assert.equal(rows.get('CPU1 DTS').value,-60));
+test('slow reduction',()=>{const a=decide(rows,cfg,{},0);assert.equal(a.fan,100);assert.equal(decide(rows,cfg,a.state,60000).fan,95);});
+test('hot DTS',()=>assert.equal(decide(parseSensors(f.replace('CPU1 DTS | -60','CPU1 DTS | -10')),cfg).mode,'auto'));
+test('fan stall',()=>assert.equal(decide(parseSensors(f.replace('FAN1 F Speed | 2400','FAN1 F Speed | 0')),cfg).mode,'auto'));
+test('missing data',()=>assert.equal(decide(new Map(),cfg).mode,'auto'));
+test('no zero fan',()=>assert.equal(decide(rows,{...cfg,minFan:0}).mode,'auto'));
+test('rising temperature',()=>assert.equal(decide(parseSensors(f.replace('CPU1 Core Rem | 32','CPU1 Core Rem | 60')),cfg,{fan:30,time:0,readings:{'CPU1 Core Rem':32}},10000).fan,100));
