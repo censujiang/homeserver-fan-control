@@ -6,6 +6,7 @@ Usage: homeserver-fan-control [options]
       --allow-remote-setup  Allow password-only first setup on a trusted network (temporary)
   -h, --help            Show help
       --version         Show installed version
+      --generate-autostart-script [options]  Write local setup-autostart.sh
       --autostart-status [options]   Inspect boot startup
       --enable-autostart [options]  Enable user systemd service (no immediate start)
       --check-update [--stable|--preview]  Check GitHub releases

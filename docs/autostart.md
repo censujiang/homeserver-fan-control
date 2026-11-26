@@ -38,11 +38,27 @@ bun scripts/entry.ts --enable-autostart --port 8080 --data-dir ./data
 
 如果需要立即切换到服务，先停止手动运行的实例，再执行页面显示 unit 对应的 `systemctl --user start <unit>`。检查 `systemctl --user status <unit>`。禁用可用 `systemctl --user disable <unit>`；停止服务需显式操作。不要同时启动两个使用同一数据目录的实例。代理等自定义环境变量、IPMI 设备组及额外权限需要自行在服务环境中配置。
 
+### 自动生成本地自启脚本（alpha.8+）
+
+独立二进制和生产源码入口启动时，自动在当前数据目录生成 `setup-autostart.sh`，启动日志和管理后台「启动管理」显示实际路径。脚本保留当前可执行文件、工作目录、监听地址、端口和数据目录，不保存初始化授权选项，不要求手工填写 unit。以原运行用户执行（不要对普通用户生成的脚本使用 sudo）：
+
+```sh
+sh /root/data/setup-autostart.sh
+```
+
+上例适用于数据目录为 /root/data 的 root 运行实例；普通用户使用自己数据目录下的脚本。也可以在程序停止时按原运行参数重新生成：
+
+```sh
+./homeserver-fan-control-linux-x64-baseline --generate-autostart-script --host 0.0.0.0 --port 9001 --data-dir /root/data
+```
+
+脚本只安装/启用开机自启，不会启动第二个进程。停止当前前台/Screen 进程后，再按脚本输出的命令启动服务。root 实例默认使用 homeserver-fan-control.service，保留当前 root 权限；长期建议专用非 root 账户。已存在且内容不同的 unit 不会覆盖；已经在 systemd 下运行时则仅启用当前服务。普通用户设置自己的 systemd 服务并检查 linger，授权不足时在宿主机完成授权。Docker 不生成脚本。
+
 ### 系统级 systemd / root 直接运行
 
 现有系统级服务可由页面检测，若未启用，在宿主机执行页面给出的 `sudo systemctl enable <unit>`（不自动 start）。Web 不执行 sudo 或安装 root 服务。
 
-直接以 root 启动时，不会自动创建以 root 运行的服务。建议先备份数据、停止当前程序，迁移到专用非 root 用户及持久化目录。参考仓库 deploy/install.sh、deploy/homeserver-fan-control.service；安装脚本默认使用 /usr/local/bin/homeserver-fan-control、/var/lib/homeserver-fan-control、127.0.0.1:3000，并会立即启用/启动。已有数据必须先安排迁移与归属、配置端口及设备权限，再启动，不能直接覆盖或并行运行。也可以通过 `sudo systemctl edit --force --full homeserver-fan-control.service` 手工创建服务，参考模板配置 User、Group、WorkingDirectory、ExecStart、数据目录和端口，再 `sudo systemctl enable homeserver-fan-control.service`。确认配置后手动 start。
+直接以 root 启动时，Web 不会自动安装系统级服务；可执行前述本地脚本保留现有权限。建议先备份数据、停止当前程序，迁移到专用非 root 用户及持久化目录。参考仓库 deploy/install.sh、deploy/homeserver-fan-control.service；安装脚本默认使用 /usr/local/bin/homeserver-fan-control、/var/lib/homeserver-fan-control、127.0.0.1:3000，并会立即启用/启动。已有数据必须先安排迁移与归属、配置端口及设备权限，再启动，不能直接覆盖或并行运行。也可以通过 `sudo systemctl edit --force --full homeserver-fan-control.service` 手工创建服务，参考模板配置 User、Group、WorkingDirectory、ExecStart、数据目录和端口，再 `sudo systemctl enable homeserver-fan-control.service`。确认配置后手动 start。
 
 ### Docker
 
@@ -74,7 +90,7 @@ bun scripts/entry.ts --enable-autostart --port 8080 --data-dir ./data
 
 Development servers and direct Nitro internal entry points are not supported for automatic installation. Stop the manually running process before starting the generated unit using systemctl --user start UNIT. Use status/disable as needed. Preserve additional proxy environment and device-group settings manually. Never run two instances against the same data directory.
 
-Existing system-level units may be detected and enabled on the host using sudo systemctl enable UNIT. The Web process never runs sudo or installs a root service. For a directly root-run process, back up and stop it, migrate data to a dedicated non-root service and configure the provided deploy template before starting. The install script uses /usr/local/bin/homeserver-fan-control, /var/lib/homeserver-fan-control and port 3000, and starts immediately; prepare migration and configuration first. Alternatively create the system unit manually with sudo systemctl edit --force --full homeserver-fan-control.service and set User, Group, WorkingDirectory, ExecStart, data and port, then enable and start explicitly.
+Existing system-level units may be detected and enabled on the host using sudo systemctl enable UNIT. The Web process never runs sudo or installs a root service. Since alpha.8, standalone/production source launches generate setup-autostart.sh in the data directory. Run it as the original account (never sudo a user-generated script). It enables the service without starting a second process, preserves paths and port, and refuses conflicting units. Root launches preserve root privileges; use a dedicated account long-term. Docker does not generate the script. Use --generate-autostart-script with the original launch options to regenerate it. For a directly root-run process, back up and stop it, migrate data to a dedicated non-root service and configure the provided deploy template before starting. The install script uses /usr/local/bin/homeserver-fan-control, /var/lib/homeserver-fan-control and port 3000, and starts immediately; prepare migration and configuration first. Alternatively create the system unit manually with sudo systemctl edit --force --full homeserver-fan-control.service and set User, Group, WorkingDirectory, ExecStart, data and port, then enable and start explicitly.
 
 Docker: run docker inspect and docker update --restart unless-stopped CONTAINER on the host; Compose already uses that restart policy. Enable Docker Engine at boot if appropriate (sudo systemctl enable docker on systemd hosts; rootless/NAS deployments differ). Manually stopped unless-stopped containers remain stopped. Do not mount the Docker socket.
 

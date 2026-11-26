@@ -19,7 +19,7 @@ if(process.argv.includes('--plugin-worker')){
   const {resolve}=await import('node:path')
   process.env.HSFC_STARTUP_ENTRY=resolve(process.argv[1]??'scripts/entry.ts')
  }
- const startupAction=['--enable-autostart','--autostart-status'].includes(process.argv[2]??'')?process.argv[2]:undefined
+ const startupAction=['--enable-autostart','--autostart-status','--generate-autostart-script'].includes(process.argv[2]??'')?process.argv[2]:undefined
  const {parseArgs,help}=await import('./cli')
  try{
   const cfg=parseArgs(process.argv.slice(startupAction?3:2),process.env)
@@ -30,13 +30,22 @@ if(process.argv.includes('--plugin-worker')){
   process.env.HSFC_ALLOW_REMOTE_SETUP=cfg.allowRemoteSetup?'1':'0'
  }catch(e){console.error((e as Error).message);console.error(help);process.exit(2)}
  if(startupAction){
-  const {autostartStatus,enableAutostart}=await import('../server/core/autostart')
+  const {autostartStatus,enableAutostart,generateAutostartScript}=await import('../server/core/autostart')
   try{
+   if(startupAction==='--generate-autostart-script'){
+    const path=await generateAutostartScript();if(!path)throw new Error('Autostart script unavailable for this deployment')
+    console.log(path)
+   }else{
    const s=startupAction==='--enable-autostart'?await enableAutostart():await autostartStatus()
    console.log(JSON.stringify(s,null,2))
    if(startupAction==='--enable-autostart'&&s.state!=='enabled')process.exitCode=1
+   }
   }catch(e){console.error((e as Error).message);process.exitCode=1}
  }else{
+  try{
+   const {generateAutostartScript}=await import('../server/core/autostart')
+   const path=await generateAutostartScript();if(path)console.log('Autostart setup script: '+path)
+  }catch(e){console.warn('Autostart script not generated: '+(e as Error).message)}
   // @ts-expect-error Nitro output is generated during production build.
   await import('../.output/server/index.mjs')
  }

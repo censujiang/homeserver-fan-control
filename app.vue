@@ -30,11 +30,11 @@ const startupReason=(s:AutostartStatus)=>{
  docker_host_required:['容器无法可靠检测宿主机的 Docker 重启策略。请在宿主机设置。','The container cannot reliably inspect the host restart policy. Configure it on the Docker host.'],
  managed_enabled:['已确认当前 systemd 服务永久启用。','The current systemd service is persistently enabled.'],
  managed_not_confirmed:['当前服务的永久自启未确认，请检查服务启用状态及 linger。','Persistent startup is not confirmed; check service enablement and linger.'],
- enabled_next_boot:['用户服务已启用且 linger 已开启；当前程序仍继续运行，下次启动时生效。','User service and linger are enabled; the current process continues, with startup at next boot.'],
+ enabled_next_boot:['服务已启用开机自启；当前程序继续运行，下次启动时生效。','Service is enabled for the next boot; the current process continues.'],
  not_detected:['未检测到本程序对应的用户 systemd 自启单元；其他启动管理器无法判断。','No matching user systemd boot unit detected; other startup managers cannot be verified.'],
  user_linger_or_enable_required:['用户服务尚未确认开机启动；需永久启用并开启 linger。','The user service needs persistent enablement and linger.'],
  user_manager_unavailable:['用户 systemd 管理器不可用，请在宿主机登录会话中执行命令。','The user systemd manager is unavailable; run the commands in a host login session.'],
- root_manual_required:['当前以 root 直接运行。请按文档迁移至非 root systemd 服务，再启用。','Running directly as root. Follow the guide to migrate to a non-root systemd service.'],
+ root_manual_required:['当前以 root 直接运行。执行本地生成的脚本可设置开机自启，保留当前权限；长期建议迁移至专用用户。','Running directly as root. Run the generated local script to enable startup with the current privileges; prefer a dedicated user long-term.'],
  systemd_unavailable:['未检测到 systemd，无法可靠设置自启。','systemd was not detected; automatic startup cannot be configured reliably.'],
  launch_unknown:['未识别受支持的生产启动入口，请使用发行二进制或 bun scripts/entry.ts。','Production launch entry not recognized; use the release executable or bun scripts/entry.ts.'],
  unit_conflict:['同名服务配置不匹配，不会自动覆盖。请在宿主机核查。','An existing unit differs; it will not be overwritten. Inspect it on the host.'],
@@ -190,7 +190,7 @@ onBeforeUnmount(()=>clearInterval(timer))
       <p>{{startupReason(startup)}}</p>
       <p v-if="startup.linger!==undefined">Linger: {{startup.linger?'enabled':'disabled'}}</p>
       <button v-if="startup.canEnable" :disabled="startupBusy" @click="enableStartup">{{text('一键设置开机自启','Enable boot startup')}}</button>
-      <p v-if="startup.commands.length">{{text('如果自动设置不可用，请在宿主机执行以下命令；Docker 请将 CONTAINER 改为实际容器名。','If automatic setup is unavailable, run these commands on the host; set CONTAINER to the actual Docker container name.')}}</p>
+      <p v-if="startup.script">{{text('已自动生成本地自启脚本：','Generated local startup script:')}} <code>{{startup.script}}</code></p><p v-if="startup.commands.length">{{text('如果自动设置不可用，请在宿主机执行以下命令；Docker 请将 CONTAINER 改为实际容器名。','If automatic setup is unavailable, run these commands on the host; set CONTAINER to the actual Docker container name.')}}</p>
       <pre v-if="startup.commands.length" style="white-space:pre-wrap;overflow-wrap:anywhere">{{startup.commands.join('\n')}}</pre>
       <button v-if="startup.commands.length" @click="copyStartup">{{startupCopied?text('已复制','Copied'):text('复制命令','Copy commands')}}</button>
       <p>{{text('不会自动重启或立即启动重复实例。','No automatic restart or immediate duplicate instance is started.')}}</p>

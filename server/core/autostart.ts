@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, writeFile, lstat, realpath } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, lstat, realpath, rename, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { resolve, join, isAbsolute } from 'node:path'
 import type { AutostartStatus } from '../../shared/autostart'
@@ -11,8 +11,8 @@ function unitQuote(s:string,exec=false){
  const escaped=s.replaceAll('\\','\\\\').replaceAll('"','\\"').replaceAll('%','%%');return '"'+(exec?escaped.split('$').join('$$'):escaped)+'"'
 }
 // systemd requires $$ to escape a literal dollar in ExecStart.
-export function renderUnit(l:Launch){
- return ['[Unit]','Description=HomeServer Fan Control (user service)','[Service]','Type=simple','WorkingDirectory='+unitQuote(l.cwd),'ExecStart='+[l.exe,...l.args].map(s=>unitQuote(s,true)).join(' '),'Restart=on-failure','TimeoutStopSec=90','NoNewPrivileges=true','UMask=0077','[Install]','WantedBy=default.target',''].join('\n')
+export function renderUnit(l:Launch,system=false){
+ return ['[Unit]',system?'Description=HomeServer Fan Control':'Description=HomeServer Fan Control (user service)','[Service]','Type=simple',...(system?['User=root']:[]),'WorkingDirectory='+unitQuote(l.cwd),'ExecStart='+[l.exe,...l.args].map(s=>unitQuote(s,true)).join(' '),'Restart=on-failure','TimeoutStopSec=90','NoNewPrivileges=true','UMask=0077','[Install]',system?'WantedBy=multi-user.target':'WantedBy=default.target',''].join('\n')
 }
 export function unitName(data:string){return 'homeserver-fan-control-'+createHash('sha256').update(data).digest('hex').slice(0,12)+'.service'}
 export function persistentState(s:string,linger?:boolean):AutostartStatus['state']{
@@ -82,24 +82,91 @@ export async function autostartStatus():Promise<AutostartStatus>{
  const current=await currentService()
  if(current){
   const enabled=await run(systemctl,[...current.flags,'is-enabled',current.unit])
+  const l=await launch().catch(()=>null),manual=l?await manualScript(l):{commands:[] as string[]}
   const linger=current.user?await lingerState():undefined
   const state=current.user&&linger===undefined&&enabled.out==='enabled'?'unknown':persistentState(enabled.out,linger)
-  return result(state,current.user?'systemd-user':'systemd-system',state==='enabled'?'managed_enabled':'managed_not_confirmed',{unit:current.unit,active:true,linger,canEnable:current.user&&uid()!==0&&state!=='enabled'&&!enabled.out.startsWith('masked'),commands:current.user?['systemctl --user enable '+shellQuote(current.unit),'sudo loginctl enable-linger '+String(uid())]:['sudo systemctl enable '+shellQuote(current.unit)]})
+  return result(state,current.user?'systemd-user':'systemd-system',state==='enabled'?'managed_enabled':'managed_not_confirmed',{unit:current.unit,active:true,linger,...manual,canEnable:current.user&&uid()!==0&&state!=='enabled'&&!enabled.out.startsWith('masked'),commands:manual.commands.length?manual.commands:current.user?['systemctl --user enable '+shellQuote(current.unit),'sudo loginctl enable-linger '+String(uid())]:[(uid()===0?'':'sudo ')+'systemctl enable '+shellQuote(current.unit)]})
  }
  const l=await launch().catch(()=>null)
  if(!l)return result('unknown','none','launch_unknown')
- if(uid()===0)return result('unknown','systemd-system','root_manual_required',{commands:['sudo systemctl edit --force --full homeserver-fan-control.service','sudo systemctl enable homeserver-fan-control.service']})
- const name=unitName(l.data),file=userPath(name),expected=renderUnit(l)
+ if(uid()===0){
+  const name='homeserver-fan-control.service',file='/etc/systemd/system/'+name
+  const found=await ownedUnit(file,renderUnit(l,true)),manual=await manualScript(l)
+  if(found==='conflict')return result('unknown','systemd-system','unit_conflict',{unit:name,...manual})
+  const enabled=await run(systemctl,['is-enabled',name])
+  const state=found==='match'?persistentState(enabled.out):enabled.out&&enabled.out!=='not-found'?'unknown':'disabled'
+  return result(state,'systemd-system',state==='enabled'?'enabled_next_boot':'root_manual_required',{unit:name,active:false,...manual})
+ }
+ const name=unitName(l.data),file=userPath(name),expected=renderUnit(l),manual=await manualScript(l)
  const found=await ownedUnit(file,expected)
  const manager=await run(systemctl,['--user','show','--property=Version','--value'])
  if(found==='conflict')return result('unknown','systemd-user','unit_conflict',{unit:name,commands:['systemctl --user cat '+shellQuote(name)]})
- if(manager.code!==0)return result('unknown','systemd-user','user_manager_unavailable',{unit:name,commands:userCommands(l)})
+ if(manager.code!==0)return result('unknown','systemd-user','user_manager_unavailable',{unit:name,...manual,commands:manual.commands.length?manual.commands:userCommands(l)})
  const enabled=await run(systemctl,['--user','is-enabled',name]),linger=await lingerState()
  // Never modify a same-named unit provided by another location.
  if(found==='missing'&&enabled.out&&!['not-found','disabled'].includes(enabled.out))return result('unknown','systemd-user','unit_conflict',{unit:name,commands:['systemctl --user cat '+shellQuote(name)]})
  const state=found==='missing'?'disabled':linger===undefined&&enabled.out==='enabled'?'unknown':persistentState(enabled.out,linger)
- return result(state,'systemd-user',state==='enabled'?'enabled_next_boot':found==='missing'?'not_detected':'user_linger_or_enable_required',{unit:name,active:false,linger,canEnable:state!=='enabled'&&!enabled.out.startsWith('masked'),commands:userCommands(l)})
+ return result(state,'systemd-user',state==='enabled'?'enabled_next_boot':found==='missing'?'not_detected':'user_linger_or_enable_required',{unit:name,active:false,linger,canEnable:state!=='enabled'&&!enabled.out.startsWith('masked'),...manual,commands:manual.commands.length?manual.commands:userCommands(l)})
 }
+
+const scriptMarker='# Generated by HomeServer Fan Control; do not edit.'
+export function renderSetupScript(l:Launch,owner:number,existing?:{unit:string;user:boolean}){
+ const name=existing?.unit??(owner===0?'homeserver-fan-control.service':unitName(l.data))
+ if(!/^[a-zA-Z0-9_.@-]+\.service$/.test(name))throw new Error('Invalid service name')
+ const command=owner===0?'/usr/bin/systemctl':'/usr/bin/systemctl --user'
+ const header=['#!/bin/sh',scriptMarker,'set -eu','umask 077','[ "$(id -u)" = '+owner+' ] || { echo "Run as the original application user (do not sudo a user script)." >&2; exit 1; }','[ -d /run/systemd/system ] || { echo "systemd is not running." >&2; exit 1; }']
+ if(existing){
+  const ctl=existing.user?'/usr/bin/systemctl --user':'/usr/bin/systemctl'
+  return [...header,ctl+' enable '+shellQuote(name),...(existing.user&&owner!==0?['/usr/bin/loginctl enable-linger '+owner+' || { echo "Run loginctl enable-linger as host administrator, then retry." >&2; exit 1; }']:[]),ctl+' is-enabled '+shellQuote(name),'echo "Existing service enabled; no restart performed."',''].join('\n')
+ }
+ if(owner!==0){
+  const args=[l.exe,...l.args]
+  args.splice(process.env.HSFC_DEPLOYMENT==='source'?2:1,0,'--enable-autostart')
+  return [...header,'cd '+shellQuote(l.cwd),args.map(shellQuote).join(' '),'echo '+shellQuote('Stop the foreground instance before running: systemctl --user start '+name),''].join('\n')
+ }
+ const target='/etc/systemd/system/'+name
+ return [...header,'[ -x '+shellQuote(l.exe)+' ] || { echo "Executable missing." >&2; exit 1; }',
+ 'echo "This service preserves the current root privileges. Prefer a dedicated account for long-term use."',
+ 'target='+shellQuote(target),'tmp=$(mktemp /etc/systemd/system/.hsfc-XXXXXX)','trap \'rm -f "$tmp"\' EXIT HUP INT TERM',
+ 'printf %s '+shellQuote(renderUnit(l,true))+' > "$tmp"','chmod 0644 "$tmp"',
+ 'if [ -e "$target" ] || [ -L "$target" ]; then',
+ '  [ ! -L "$target" ] && [ -f "$target" ] && cmp -s "$tmp" "$target" || { echo "Existing service differs; refusing overwrite." >&2; exit 1; }',
+ 'else',
+ '  fragment=$('+command+' show '+shellQuote(name)+' --property=FragmentPath --value 2>/dev/null || true)',
+ '  [ -z "$fragment" ] || { echo "Existing service in another location; refusing overwrite." >&2; exit 1; }',
+ '  ln "$tmp" "$target"',
+ 'fi',
+ command+' daemon-reload',command+' enable '+shellQuote(name),command+' is-enabled '+shellQuote(name),
+ 'echo '+shellQuote('Enabled for next boot. Stop the foreground/Screen process before running: systemctl start '+name),
+ 'echo "No new process was started."',''].join('\n')
+}
+const scriptPath=(l:Launch)=>join(l.data,'setup-autostart.sh')
+async function privateData(l:Launch){
+ await mkdir(l.data,{recursive:true,mode:0o700})
+ const d=await lstat(l.data)
+ if(!d.isDirectory()||d.isSymbolicLink()||d.uid!==uid()||(d.mode&0o022)!==0)throw new Error('Data directory is not privately owned')
+}
+export async function generateAutostartScript(){
+ if(process.platform!=='linux'||process.env.HSFC_DEPLOYMENT==='docker'||existsSync('/.dockerenv')||existsSync('/run/.containerenv'))return null
+ const l=await launch(),owner=uid()
+ if(!l||owner===undefined)return null
+ await privateData(l)
+ const path=scriptPath(l),current=await currentService()
+ const content=renderSetupScript(l,owner,current??undefined)
+ try{
+  const old=await lstat(path)
+  if(!old.isFile()||old.isSymbolicLink()||old.uid!==owner||(old.mode&0o022)!==0||!(await readFile(path,'utf8')).startsWith('#!/bin/sh\n'+scriptMarker+'\n'))throw new Error('Existing script is not managed; refusing overwrite')
+  if((await readFile(path,'utf8'))===content)return path
+ }catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e}
+ const tmp=path+'.'+randomBytes(8).toString('hex')+'.tmp'
+ try{await writeFile(tmp,content,{flag:'wx',mode:0o700});await rename(tmp,path)}finally{await rm(tmp,{force:true})}
+ return path
+}
+async function manualScript(l:Launch){
+ try{const p=scriptPath(l),st=await lstat(p);if(st.isFile()&&!st.isSymbolicLink()&&st.uid===uid()&&(st.mode&0o022)===0)return {script:p,commands:['sh '+shellQuote(p)]}}catch{/* not generated */}
+ return {commands:[] as string[]}
+}
+
 let enabling=false
 export async function enableAutostart():Promise<AutostartStatus>{
  if(enabling)throw new Error('Autostart setup already running')

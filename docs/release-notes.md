@@ -1,4 +1,4 @@
-## v0.3.0-alpha.7 — Usability and first-run setup / 易用性与初始化
+## v0.3.0-alpha.8 — Local startup installer and usability / 自启脚本与易用性
 
 - Password-only administrator setup: no manual setup key; default loopback-only, explicit temporary opt-in for trusted LAN or Docker setup. Existing administrator and data remain unchanged.
 - Grouped monitoring dashboard with search, collapsed discrete events, raw readings, translated health and normalized sensor units.
@@ -11,3 +11,5 @@
 Physical writes remain disabled. Keep factory AUTO. Do not expose an uninitialized server to untrusted networks; existing administrators do not need to set up again.
 
 - Correctly clone and validate reactive Vue policy data when editing an existing server.
+
+- Automatically generate a local setup-autostart.sh with current executable, port and data path; root and non-root support; no automatic restart or overwrite of conflicting units.

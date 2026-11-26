@@ -120,6 +120,8 @@ docker compose logs -f
 
 Web 后台「启动管理」显示已设置、未设置或未知。普通非 root 二进制及生产源码运行可在 systemd 用户管理器可用时一键启用（不立即启动第二个进程），权限不足时复制宿主机命令。Docker 显示未知并给出重启策略设置提示。参见[开机自启动指南](docs/autostart.md)。
 
+独立二进制和生产源码启动时（alpha.8 起）自动生成数据目录下的 `setup-autostart.sh`。按启动日志或后台显示的路径，以原运行用户执行即可，例如 `sh /root/data/setup-autostart.sh`。脚本只启用开机自启，不启动重复进程；停止旧进程后按脚本提示启动 systemd 服务。
+
 ### systemd / 长期运行
 
 下载已校验的二进制并获取仓库 deploy 目录：
@@ -283,6 +285,8 @@ Choose the plugin for your hardware. See its dedicated guide for connection sett
 ### Boot startup
 
 The Startup page reports enabled, disabled or unknown. Non-root standalone and production source deployments can enable a systemd user service when available, without starting a duplicate process. If permission is missing, copy the host commands. Docker reports unknown and provides restart-policy instructions. See the [startup guide](docs/autostart.md).
+
+Since alpha.8, standalone and production source launches generate `setup-autostart.sh` in the data directory. Run it as the original application user, e.g. `sh /root/data/setup-autostart.sh`. It enables boot startup without launching a duplicate instance; stop the old process before starting the service.
 
 ### systemd
 

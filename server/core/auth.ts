@@ -15,7 +15,10 @@ export function setupAllowed(e:H3Event){
  if(getHeader(e,'sec-fetch-site')==='cross-site')return false
  if(process.env.HSFC_ALLOW_REMOTE_SETUP==='1')return true
  const bind=process.env.NITRO_HOST??process.env.HOST??'127.0.0.1'
- return loopback(bind)&&loopback(getRequestIP(e,{xForwardedFor:false}))&&/^(?:localhost|127\.\d+\.\d+\.\d+|\[::1\])(?::\d+)?$/i.test(host)
+ const ip=getRequestIP(e,{xForwardedFor:false})
+ // Bun/Nitro may not populate the peer IP. The explicit loopback listener
+ // plus local Host and same-origin checks remain mandatory in that case.
+ return loopback(bind)&&(!ip||loopback(ip))&&/^(?:localhost|127\.\d+\.\d+\.\d+|\[::1\])(?::\d+)?$/i.test(host)
 }
 let initializing=false
 export async function setup(password:string){

@@ -18,19 +18,23 @@ while read -r asset; do curl -fsS "http://127.0.0.1:18765$asset" >/dev/null; don
 test -f data/database.sqlite
 ./app --help | grep -q -- --port
 if ./app --port 65536; then echo "Invalid port accepted"; exit 1; fi
+test -x data/setup-autostart.sh
+sh -n data/setup-autostart.sh
+grep -q '18765' data/setup-autostart.sh
 test ! -e data/setup-token
-test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: evil.example' -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 403
-test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Origin: http://evil.example' -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 403
-test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"password":"short"}' http://127.0.0.1:18765/api/auth/setup)" = 400
+echo "Checking rejected setup requests"
+test "$(curl -s -o /dev/stderr -w '%{http_code}' -H 'Host: evil.example' -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 403
+test "$(curl -s -o /dev/stderr -w '%{http_code}' -H 'Origin: http://evil.example' -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 403
+test "$(curl -s -o /dev/stderr -w '%{http_code}' -H 'Content-Type: application/json' -d '{"password":"short"}' http://127.0.0.1:18765/api/auth/setup)" = 400
 curl -fsS -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/setup
-test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"password":"another-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 409
+test "$(curl -s -o /dev/stderr -w '%{http_code}' -H 'Content-Type: application/json' -d '{"password":"another-password-1234"}' http://127.0.0.1:18765/api/auth/setup)" = 409
 session=$(curl -fsS -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/login | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
 curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18765/api/dashboard | grep -q huawei.imana200
 test "$(./app --version)" = "$version"
 ./app --autostart-status | python3 -c 'import sys,json;x=json.load(sys.stdin);assert x["state"] in ("enabled","disabled","unknown")'
-test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18765/api/autostart/status)" = 401
+test "$(curl -s -o /dev/stderr -w '%{http_code}' http://127.0.0.1:18765/api/autostart/status)" = 401
 curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18765/api/autostart/status | python3 -c 'import sys,json;x=json.load(sys.stdin);assert x["state"] in ("enabled","disabled","unknown")'
-test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18765/api/update/status)" = 401
+test "$(curl -s -o /dev/stderr -w '%{http_code}' http://127.0.0.1:18765/api/update/status)" = 401
 curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18765/api/update/status | python3 -c 'import sys,json;x=json.load(sys.stdin);assert x["deployment"]=="binary" and x["current"]==sys.argv[1]' "$version"
 curl -fsS -H "Authorization: Bearer $session" -H 'Content-Type: application/json' -d '{"name":"Smoke test","plugin":"mock","transport":"mock","mode":"DRY_RUN","config":{},"policy":{"sensors":[{"id":"cpu","warm":40,"hot":65}],"fans":["fan"]}}' http://127.0.0.1:18765/api/instances
 sleep 7
