@@ -1,10 +1,10 @@
-## v0.3.0-alpha.4 — Legacy CPU compatibility / 老款 CPU 兼容性
+## v0.3.0-alpha.5 — Administrator setup validation / 管理员初始化修复
 
-- Upgrade build runtime and Docker build stage from Bun 1.3.13 to 1.4.5.
-- Use the unified Linux x64 compilation target; retain the existing baseline asset name for updater compatibility.
-- Add an Ivy Bridge CPU emulation startup gate to CI, covering the executable, SQLite initialization and HTTP startup.
-- Actual hardware: Bun 1.4.5 JavaScript and SQLite passed on an Ivy Bridge Xeon E5 v2 host. The complete rebuilt executable still needs physical-host verification.
+- Trim leading/trailing setup-token whitespace and require exactly 64 hexadecimal characters.
+- Return HTTP 400 for invalid setup/login input instead of uncaught Zod errors (HTTP 500).
+- Provide bilingual setup instructions and actionable validation errors in the Web UI.
+- Add HTTP regression tests for malformed token, short password, incorrect token, invalid login and whitespace-tolerant initialization.
+- Retain Bun 1.4.5 and Ivy Bridge compatibility gate.
 
-旧版本 Bun 1.3.13 在目标实机发生 Illegal instruction。请重新下载新版二进制或 Docker 镜像，旧二进制内置运行时不会因系统安装新版 Bun 而改变。保留数据目录和原厂 AUTO；物理风扇写入仍未开放。
-
-Older releases embed Bun 1.3.13 and crashed on the target host. Download the new executable or Docker image; updating the host Bun does not change an embedded runtime. Preserve the data directory and factory AUTO mode. Hardware writes remain disabled.
+保留现有数据目录；不需要重新初始化已创建的管理员。真实风扇写入仍未开放。
+Keep the existing data directory; already initialized administrators do not need to set up again. Physical fan writes remain disabled.

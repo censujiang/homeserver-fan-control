@@ -1,3 +1,8 @@
 import { z } from 'zod'
 import { login } from '../../core/auth'
-export default defineEventHandler(async e=>({token:await login(z.object({password:z.string().max(128)}).parse(await readBody(e)).password)}))
+const schema=z.object({password:z.string().min(1).max(128)})
+export default defineEventHandler(async e=>{
+ const b=schema.safeParse(await readBody(e))
+ if(!b.success)throw createError({statusCode:400,statusMessage:'Invalid login input'})
+ return {token:await login(b.data.password)}
+})

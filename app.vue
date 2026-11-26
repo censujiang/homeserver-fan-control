@@ -61,7 +61,20 @@ async function refresh(){
 }
 async function action(f:()=>Promise<void>){busy.value=true;error.value='';try{await f()}catch(e){error.value=(e as Error).message}finally{busy.value=false}}
 async function signIn(){await action(async()=>{
- if(needsSetup.value){await $fetch('/api/auth/setup',{method:'POST',body:{token:setupToken.value,password:password.value}});needsSetup.value=false}
+ if(needsSetup.value){
+  const clean=setupToken.value.trim()
+  if(!/^[0-9a-f]{64}$/.test(clean))throw new Error(text('初始化密钥必须是 64 位十六进制字符。请执行 cat data/setup-token; echo，只复制密钥本身。','Setup token must contain exactly 64 hexadecimal characters. Run cat data/setup-token; echo and copy only the token.'))
+  if(password.value.length<12||password.value.length>128)throw new Error(text('管理员密码须为 12～128 个字符。','Administrator password must contain 12–128 characters.'))
+  try{await $fetch('/api/auth/setup',{method:'POST',body:{token:clean,password:password.value}})}
+  catch(e){
+   const status=(e as {statusCode?:number}).statusCode
+   if(status===403)throw new Error(text('初始化密钥不正确，或管理员已初始化。请刷新页面并检查密钥。','Incorrect setup token or administrator already initialized. Refresh and check the token.'))
+   if(status===400)throw new Error(text('初始化参数格式不正确，请检查密钥和密码。','Invalid setup input; check token and password.'))
+   if(status===409)throw new Error(text('管理员已初始化，请刷新后登录。','Administrator already initialized; refresh to sign in.'))
+   throw e
+  }
+  needsSetup.value=false
+ }
  const result=await $fetch<{token:string}>('/api/auth/login',{method:'POST',body:{password:password.value}})
  token.value=result.token;sessionStorage.setItem('token',token.value);password.value='';setupToken.value='';await refresh()
 })}
@@ -87,7 +100,7 @@ onBeforeUnmount(()=>clearInterval(timer))
  <main :class="{dark}">
   <header><div><small>HOMESERVER / CONTROL</small><h1>{{text('智能散热管理','Fan Control')}}</h1></div><div class="actions"><button @click="lang=lang==='zh'?'en':'zh'">{{lang==='zh'?'EN':'中文'}}</button><button @click="dark=!dark">{{dark?'☀':'☾'}}</button><button v-if="token" @click="signOut">{{text('退出','Sign out')}}</button></div></header>
   <div v-if="error" role="alert" class="warning">{{error}}</div>
-  <section v-if="!token" class="login"><h2>{{needsSetup?text('初始化管理员','Initialize administrator'):text('管理员登录','Administrator login')}}</h2><form @submit.prevent="signIn"><label v-if="needsSetup">{{text('数据目录 setup-token 文件中的密钥','Token from setup-token in data directory')}}<input v-model="setupToken" type="password" required></label><label>{{text('管理员密码','Password')}}<input v-model="password" type="password" required :minlength="needsSetup?12:1"></label><button :disabled="busy">{{text('继续','Continue')}}</button></form></section>
+  <section v-if="!token" class="login"><h2>{{needsSetup?text('初始化管理员','Initialize administrator'):text('管理员登录','Administrator login')}}</h2><form @submit.prevent="signIn"><label v-if="needsSetup">{{text('数据目录 setup-token 文件中的密钥','Token from setup-token in data directory')}}<input v-model.trim="setupToken" type="password" required autocomplete="off" spellcheck="false" autocapitalize="off"><small>{{text("在服务端执行 cat data/setup-token; echo，仅复制 64 位密钥，不含终端提示符。","On the server, run cat data/setup-token; echo and copy only the 64-character token.")}}</small></label><label>{{text('管理员密码','Password')}}<input v-model="password" type="password" required :minlength="needsSetup?12:1" maxlength="128" :autocomplete="needsSetup?'new-password':'current-password'"></label><button :disabled="busy">{{text('继续','Continue')}}</button></form></section>
   <template v-else>
    <nav><button v-for="[id,zh,en] in [['monitor','监控','Monitor'],['servers','服务器 / 策略','Servers / policies'],['plugins','插件','Plugins'],['history','历史','History'],['events','事件','Events'],['updates','软件更新','Updates'],['startup','启动管理','Startup']]" :key="id" :class="{active:tab===id}" @click="tab=id">{{text(zh,en)}}</button></nav>
    <p><button @click="tab='startup'" :class="startup?.state==='enabled'?'ok':'muted'">{{startupLabel(startup)}}</button></p>
