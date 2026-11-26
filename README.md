@@ -21,10 +21,10 @@
 
 ### 快速开始：独立二进制（推荐 Linux 裸金属 / 物理机）
 
-在 Linux x86_64 物理机上复制以下命令即可下载、校验并启动（需要 curl 和 sha256sum）。当前示例使用公开版本 v0.3.0-alpha.3，其他版本请查看 [Releases](https://github.com/censujiang/homeserver-fan-control/releases)。建议优先在被管理的裸金属 Linux 服务器运行；虚拟机或其他主机也可使用兼容的远程插件。
+在 Linux x86_64 物理机上复制以下命令即可下载、校验并启动（需要 curl、python3 和 sha256sum）。自动选择已发布且附件齐全的版本（含预发行版），其他版本请查看 [Releases](https://github.com/censujiang/homeserver-fan-control/releases)。建议优先在被管理的裸金属 Linux 服务器运行；虚拟机或其他主机也可使用兼容的远程插件。
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.3
+BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
 curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
@@ -63,10 +63,10 @@ PORT=18080 ./homeserver-fan-control-linux-x64-baseline
 
 **方式 A：下载已构建的发行镜像，不需要源码。**
 
-复制以下命令下载发行镜像、校验并导入：
+复制以下命令下载发行镜像、校验并导入（需要 curl、python3 和 sha256sum）：
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.3
+BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
 curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
@@ -186,10 +186,10 @@ HomeServer Fan Control is an open-source cooling-management project for home ser
 
 ### Quick start: standalone executable (recommended on bare-metal Linux / physical machines)
 
-Copy these commands on a Linux x86_64 machine to download, verify and start the application (requires curl and sha256sum). The example uses public release v0.3.0-alpha.3; see [Releases](https://github.com/censujiang/homeserver-fan-control/releases) for other versions. Prefer the managed bare-metal Linux server; VMs and other hosts can also use compatible remote plugins.
+Copy these commands on a Linux x86_64 machine to download, verify and start the application (requires curl, python3 and sha256sum). This selects a published release with all assets (including previews); see [Releases](https://github.com/censujiang/homeserver-fan-control/releases) for other versions. Prefer the managed bare-metal Linux server; VMs and other hosts can also use compatible remote plugins.
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.3
+BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
 curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
@@ -225,10 +225,10 @@ Use a firewall and an HTTPS reverse proxy before exposing the service beyond loo
 
 ### Docker (Linux amd64)
 
-**Option A: load the published image archive.** Copy the following commands to download, verify and load the release image.
+**Option A: load the published image archive.** Copy the following commands to download, verify and load the release image (requires curl, python3 and sha256sum).
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.3
+BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
 curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
