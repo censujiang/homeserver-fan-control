@@ -21,6 +21,8 @@
 
 ### 快速开始：独立二进制（推荐 Linux 裸金属 / 物理机）
 
+老款 x86_64 CPU（如 Ivy Bridge / Xeon E5 v2）请使用 v0.3.0-alpha.4 或更新的发行版。alpha.1–alpha.3 内嵌 Bun 1.3.13，已在实机发现 Illegal instruction。alpha.4 起采用 Bun 1.4.5 的统一 x64 构建，保留原发行附件名称以兼容下载和更新器。
+
 在 Linux x86_64 物理机上复制以下命令即可下载、校验并启动（需要 curl、python3 和 sha256sum）。自动选择已发布且附件齐全的版本（含预发行版），其他版本请查看 [Releases](https://github.com/censujiang/homeserver-fan-control/releases)。建议优先在被管理的裸金属 Linux 服务器运行；虚拟机或其他主机也可使用兼容的远程插件。
 
 ```sh
@@ -185,6 +187,8 @@ HomeServer Fan Control is an open-source cooling-management project for home ser
 - Linux x64 baseline standalone executable, Docker image, Compose and systemd.
 
 ### Quick start: standalone executable (recommended on bare-metal Linux / physical machines)
+
+For older x86_64 CPUs (e.g. Ivy Bridge / Xeon E5 v2), use v0.3.0-alpha.4 or newer. Alpha.1–alpha.3 embed Bun 1.3.13, which produced an illegal-instruction crash on physical hardware. Alpha.4 uses Bun 1.4.5's unified x64 build while retaining the existing release asset name for download and updater compatibility.
 
 Copy these commands on a Linux x86_64 machine to download, verify and start the application (requires curl, python3 and sha256sum). This selects a published release with all assets (including previews); see [Releases](https://github.com/censujiang/homeserver-fan-control/releases) for other versions. Prefer the managed bare-metal Linux server; VMs and other hosts can also use compatible remote plugins.
 

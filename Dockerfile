@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 ARG BINARY_SOURCE=build
-FROM oven/bun:1.3.13 AS build
+FROM oven/bun:1.4.5 AS build
 WORKDIR /src
 COPY package.json ./
 RUN bun install --linker hoisted

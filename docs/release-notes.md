@@ -1,10 +1,10 @@
-## v0.3.0-alpha.3 — Startup management and plugin onboarding / 启动管理与插件接入
+## v0.3.0-alpha.4 — Legacy CPU compatibility / 老款 CPU 兼容性
 
-- Web boot startup status, user systemd setup and copyable host commands.
-- CLI --autostart-status and --enable-autostart; preserves current host, port and data path without immediate duplicate start.
-- Docker restart-policy guidance; no Docker socket access.
-- Agent-friendly external plugin onboarding: local/SSH read-only discovery, fixtures, SDK constraints and ZIP example.
+- Upgrade build runtime and Docker build stage from Bun 1.3.13 to 1.4.5.
+- Use the unified Linux x64 compilation target; retain the existing baseline asset name for updater compatibility.
+- Add an Ivy Bridge CPU emulation startup gate to CI, covering the executable, SQLite initialization and HTTP startup.
+- Actual hardware: Bun 1.4.5 JavaScript and SQLite passed on an Ivy Bridge Xeon E5 v2 host. The complete rebuilt executable still needs physical-host verification.
 
-公开 Alpha：真实硬件写入仍禁用；外置插件隔离仍待验证，不能直接访问网络或宿主机硬件。systemd 一键设置取决于实际宿主机用户管理器及 linger 授权；无权限时手动配置。保留原厂 AUTO。
+旧版本 Bun 1.3.13 在目标实机发生 Illegal instruction。请重新下载新版二进制或 Docker 镜像，旧二进制内置运行时不会因系统安装新版 Bun 而改变。保留数据目录和原厂 AUTO；物理风扇写入仍未开放。
 
-Public alpha: physical writes remain disabled; external sandbox does not allow direct hardware/network access. One-click systemd setup depends on host user manager and linger permissions. Keep factory AUTO.
+Older releases embed Bun 1.3.13 and crashed on the target host. Download the new executable or Docker image; updating the host Bun does not change an embedded runtime. Preserve the data directory and factory AUTO mode. Hardware writes remain disabled.

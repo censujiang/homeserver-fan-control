@@ -1,6 +1,6 @@
 {
   "name": "homeserver-fan-control",
-  "version": "0.3.0-alpha.3",
+  "version": "0.3.0-alpha.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "typecheck": "bun --bun nuxt typecheck",
     "test": "bun test tests",
     "lint": "bunx eslint .",
-    "compile": "bun build scripts/entry.ts --compile --target=bun-linux-x64-baseline --outfile dist/homeserver-fan-control"
+    "compile": "bun build scripts/entry.ts --compile --target=bun-linux-x64 --outfile dist/homeserver-fan-control"
   },
   "dependencies": {
     "nuxt": "^3.20.0",
