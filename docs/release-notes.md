@@ -1,15 +1,10 @@
-## v0.3.0-alpha.8 — Local startup installer and usability / 自启脚本与易用性
+## v0.3.0-alpha.9 — Experimental iMana SSH control / iMana SSH 实验调速
 
-- Password-only administrator setup: no manual setup key; default loopback-only, explicit temporary opt-in for trusted LAN or Docker setup. Existing administrator and data remain unchanged.
-- Grouped monitoring dashboard with search, collapsed discrete events, raw readings, translated health and normalized sensor units.
-- Actual iMana discrete bitmaps remain unknown until vendor-specific event meanings are verified, rather than falsely marked as faults.
-- Form-based optional simulation policy editor, advanced JSON, connection/mode explanations and links.
-- Screen instructions for SSH disconnect and systemd guidance.
-- Bun 1.4.5 and legacy CPU CI gate retained.
+- Implement explicit experimental SSH ADAPTIVE for iMana 7.38, board 0xaa09, verified serial identity and pinned SSH key.
+- Parse actual health and fan mode/level/remaining-time replies (including values without a percent sign).
+- Mandatory two CPU DTS, inlet and eight rotor guards; 30–100% target, finite 30-second leases, readback, fallback and fault latch.
+- UI capability/mode indicators and Stop control / AUTO action. Default remains MONITOR.
+- Local IPMI remains read-only: legacy OEM write protocol and timeout have not been verified.
+- Unit tests use recorded reply formats; physical repeated lease renewal/load testing still pending.
 
-真实硬件写入仍禁用，原厂 AUTO 不受影响。首次初始化前不要向不可信网络暴露端口；已初始化用户无需重新设置密码。
-Physical writes remain disabled. Keep factory AUTO. Do not expose an uninitialized server to untrusted networks; existing administrators do not need to set up again.
-
-- Correctly clone and validate reactive Vue policy data when editing an existing server.
-
-- Automatically generate a local setup-autostart.sh with current executable, port and data path; root and non-root support; no automatic restart or overwrite of conflicting units.
+默认不接管真实硬件。请先使用 MONITOR/DRY_RUN，在现场监护下测试。仅 30% 和单次 30 秒回退已有实机依据；不保证连续续期或负载表现。保留原有数据目录。

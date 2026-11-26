@@ -6,7 +6,7 @@
 
 内置插件 ID：`huawei.imana200`。无需额外安装插件，在 Web 后台添加服务器时选择 Huawei iMana 200，再选择 SSH 或 Local IPMI。
 
-**当前为只读安全预览。** 两种连接方式均禁止实际风扇写入，请保持 BMC 原厂 AUTO。
+**SSH 实验调速已接入；Local IPMI 仍只读。** 默认 MONITOR，真实 ADAPTIVE 需显式开启、现场监督验证。
 
 ### 连接方式与部署
 
@@ -45,7 +45,7 @@ docker run -d --name hsfc-ipmi \
 
 SSH 模式填写管理 IP/主机名、SSH 端口（默认 22）、用户名、密码或私钥（二选一）、已核验的 SHA256 主机公钥指纹及超时（默认 10000 ms）。使用交互式 Shell，不依赖 SSH Exec。旧设备协议兼容性需实测，不要降低系统全局 SSH 安全策略。
 
-Local IPMI 模式配置设备 `/dev/ipmi0` 及超时（默认 12000 ms），当前使用 `/usr/bin/ipmitool`，无需 BMC 管理网络或 SSH 凭据。推荐在被管理的裸金属 Linux 物理机运行。选择 MONITOR；DRY_RUN 仅模拟，真实 ADAPTIVE 尚未开放。
+Local IPMI 模式配置设备 `/dev/ipmi0` 及超时（默认 12000 ms），当前使用 `/usr/bin/ipmitool`，无需 BMC 管理网络或 SSH 凭据。推荐在被管理的裸金属 Linux 物理机运行。Local IPMI 选择 MONITOR；DRY_RUN 仅模拟。SSH 可按下面说明开启实验 ADAPTIVE。
 
 ### 已知限制
 
@@ -55,7 +55,7 @@ Local IPMI 模式配置设备 `/dev/ipmi0` 及超时（默认 12000 ms），当�
 
 Built-in plugin ID: `huawei.imana200`. No additional installation is needed. Add a server in the Web UI, select Huawei iMana 200, then SSH or Local IPMI.
 
-**Read-only safety preview.** Neither transport performs physical fan writes. Keep factory BMC cooling in AUTO.
+**Experimental SSH control, read-only Local IPMI.** Default MONITOR; actual ADAPTIVE requires explicit opt-in and supervised validation.
 
 ### Transports and deployment
 
@@ -83,8 +83,16 @@ Ensure the group has appropriate device permissions via a restricted host rule. 
 
 For SSH, enter the management host, SSH port (default 22), username, either a password or a private key, the independently verified SHA256 host-key fingerprint, and timeout (default 10000 ms). The driver uses an interactive shell rather than SSH Exec. Legacy protocol compatibility needs hardware verification; do not weaken global SSH security settings.
 
-For Local IPMI, configure `/dev/ipmi0` and timeout (default 12000 ms). The current driver uses `/usr/bin/ipmitool`, with no management network or SSH credentials required. Prefer the managed bare-metal Linux machine. Select MONITOR; DRY_RUN is simulation only. Physical ADAPTIVE is unavailable.
+For Local IPMI, configure `/dev/ipmi0` and timeout (default 12000 ms). The current driver uses `/usr/bin/ipmitool`, with no management network or SSH credentials required. Prefer the managed bare-metal Linux machine. Select MONITOR; DRY_RUN is simulation only. Local IPMI ADAPTIVE is unavailable; SSH experimental ADAPTIVE is described below.
 
 ### Known limitations
 
 The documented test hardware uses iMana 200 firmware 7.38, manufacturer ID 2011, product ID 0xAA81. Earlier manual tests established read access and a limited SSH manual mode, but the new driver still needs real hardware validation of output parsing, identity, health and repeated leases. Never use unverified OEM write commands. See [safety acceptance status](../../refactor-status.md).
+
+## SSH 实验控制 / Experimental SSH control
+
+仅支持已记录的 iMana 7.38、主板 0xaa09，且须成功读取有效序列号、核验 SSH 指纹。先用 MONITOR/DRY_RUN 确认全部传感器及健康，再将 SSH 连接参数 control 设置为 experimental，选择 ADAPTIVE。仅现场有人监护时尝试；30–100% 区间中仅 30% 已实机测试，连续续期和负载安全尚未实机确认。必须检查两颗 DTS、进风温度和全部八转子。每次手动租约 30 秒，严格读回，禁止永久手动；出错停止控制并尝试 AUTO，未确认时依赖硬件已验证的超时机制。切换 MONITOR/删除/关闭时尝试恢复 AUTO。不要并行运行其他风扇控制程序或使用手动模式。默认安全阈值是保守初始值而非实机校准；可收紧，不能放宽。
+
+Only the recorded iMana 7.38 / board 0xaa09 profile with valid serial and pinned SSH key is eligible. Verify MONITOR/DRY_RUN first; explicitly set SSH control=experimental and ADAPTIVE. Supervise at the server. Only 30% has been physically tested; repeated renewal and load behavior remain unverified. Mandatory protections cover both DTS, inlet, all eight rotors. Finite 30-second leases, readback, and AUTO on failures; never permanent manual. Do not run other controllers concurrently. Switch MONITOR to stop. The conservative guard thresholds are not hardware-calibrated; users can tighten them.
+
+Local IPMI OEM control remains unverified for this legacy firmware. The modern openUBMC read-only Get Fan Mode specification uses command 0x30/0x91 with vendor prefix db 07 00 and subcommand 02; its timeout is in minutes, not the verified SSH seconds. Do not assume compatibility or use its write commands on iMana 200.

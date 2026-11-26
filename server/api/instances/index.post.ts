@@ -8,7 +8,7 @@ export default defineEventHandler(async e=>{
  const p=instanceSchema.safeParse(await readBody(e))
  if(!p.success)throw createError({statusCode:400,statusMessage:'Invalid instance configuration'})
  const b=p.data
- if(b.mode==='ADAPTIVE'&&b.plugin!=='mock')throw createError({statusCode:409,statusMessage:'Hardware write capability not validated'})
+ if(b.mode==='ADAPTIVE'&&b.plugin!=='mock'&&!(b.plugin==='huawei.imana200'&&b.transport==='ssh'&&b.config.control==='experimental'))throw createError({statusCode:409,statusMessage:'Hardware write capability not validated'})
  const plugin=plugins.get(b.plugin)
  if(!plugin)throw createError({statusCode:400,statusMessage:'Unknown plugin'})
  try{const d=plugin.create(b.transport,b.config);await d.close()}catch{throw createError({statusCode:400,statusMessage:'Invalid driver configuration'})}

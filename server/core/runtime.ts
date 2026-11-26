@@ -2,6 +2,7 @@ import { database, instances, event } from './db'
 import { plugins } from './registry'
 import { decide, type Decision } from './engine'
 import { LeaseController } from './lease'
+import { imanaPolicy } from '../drivers/imana-control'
 import type { Capability, Driver, Instance, Sample } from '../../shared/model'
 export interface Live { sample?:Sample; decision?:Decision; capability?:Capability; online:boolean; error?:string }
 class Runner{
@@ -12,6 +13,7 @@ class Runner{
  private pending?:Promise<void>
  private stopped=false
  private lastSave=0
+ private controlFault=false
  constructor(readonly instance:Instance){}
  start(){this.schedule(0)}
  private schedule(ms:number){if(!this.stopped)this.timer=setTimeout(()=>{this.pending=this.poll().finally(()=>{this.pending=undefined;this.schedule(5000)})},ms)}
@@ -21,23 +23,27 @@ class Runner{
    if(!this.driver){const plugin=plugins.get(i.plugin);if(!plugin)throw new Error('Plugin unavailable');this.driver=plugin.create(i.transport,i.config);await this.driver.connect()}
    const sample=await this.driver.sample()
    const capability=this.driver.capabilities()
-   const decision= (i.mode==='DRY_RUN'||i.mode==='ADAPTIVE')?decide(sample,i.policy,this.live.decision?.state):undefined
-   // Real hardware is intentionally not allowed to take over in this preview.
+   const decision= (i.mode==='DRY_RUN'||i.mode==='ADAPTIVE')?decide(sample,i.plugin==='huawei.imana200'?imanaPolicy(i.policy):i.policy,this.live.decision?.state):undefined
    if(i.mode==='ADAPTIVE'){
-    if(i.plugin!=='mock'||!capability.write||!capability.timedFallback)throw new Error('Write capability not validated')
-    this.lease??=new LeaseController(i.id,this.driver)
-    await this.lease.tick(sample,decision?.target??null)
+    const real=i.plugin==='huawei.imana200'&&i.transport==='ssh'
+    if(!capability.write||!capability.timedFallback||(!real&&i.plugin!=='mock'))throw new Error('Write capability not validated')
+    if(!this.controlFault){
+     this.lease??=new LeaseController(i.id,this.driver)
+     try{await this.lease.tick(sample,decision?.target??null)}
+     catch(e){this.controlFault=true;await this.lease.fallback();event('Control suspended after failed write/readback; review configuration and re-save to rearm',i.id);throw e}
+    }
    }
-   this.live={online:true,sample,capability,decision}
+   this.live={online:true,sample,capability,decision,...(this.controlFault?{error:'Control suspended; review and re-save configuration to rearm'}:{})}
    if(Date.now()-this.lastSave>=30000){database().run('INSERT OR REPLACE INTO samples VALUES(?,?,?)',[i.id,sample.at,JSON.stringify(this.live)]);this.lastSave=Date.now()}
   }catch{
+   if(i.mode==='ADAPTIVE'&&i.plugin!=='mock'&&this.lease)this.controlFault=true
    await this.lease?.fallback();this.lease=undefined
    if(this.live.online||!this.live.error)event('Monitoring failed; control stopped',i.id)
    this.live={online:false,error:'Connection or sampling failed'}
    await this.driver?.close().catch(()=>{});this.driver=undefined
   }
  }
- async stop(){this.stopped=true;clearTimeout(this.timer);await this.pending;await this.lease?.fallback();this.lease=undefined;await this.driver?.close();this.live={online:false}}
+ async stop(){this.stopped=true;clearTimeout(this.timer);await this.pending;await this.lease?.fallback();this.lease=undefined;await this.driver?.close().catch(()=>{});this.live={online:false}}
 }
 class Monitor{
  private runners=new Map<string,Runner>()

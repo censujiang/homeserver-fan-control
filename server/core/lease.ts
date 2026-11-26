@@ -14,7 +14,8 @@ export class LeaseController {
   if(this.identity&&this.identity!==s.identity){await this.fallback();throw new Error('Hardware identity changed')}
   const lock=owners.get(s.identity)
   if(lock&&lock.owner!==this.owner&&lock.expires>now)throw new Error('Duplicate control owner')
-  if(this.active&&(s.fanMode!=='MANUAL'||s.fanLevel!==this.level)){await this.fallback();throw new Error('Unexpected fan mode or target')}
+  if(!this.active&&s.fanMode!=='AUTO')throw new Error('Existing manual mode; refusing takeover')
+  if(this.active&&(s.fanMode!=='MANUAL'||s.fanLevel!==this.level||(s.leaseRemaining!==undefined&&(s.leaseRemaining<1||s.leaseRemaining>30)))){await this.fallback();throw new Error('Unexpected fan mode or target')}
   if(this.active&&now-this.last<8000&&target===this.level)return
   this.identity=s.identity
   owners.set(s.identity,{owner:this.owner,expires:now+45000})

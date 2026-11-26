@@ -12,3 +12,5 @@ test('virtual lease, duplicate owner, fallback and readback',async()=>{
  expect((await other.sample()).fanLevel).toBe(50)
  await b.fallback()
 })
+
+test('refuse takeover of pre-existing manual mode',async()=>{const d=mock.create('mock',{});await d.manual(40,30);const l=new LeaseController('external',d);await expect(l.tick(await d.sample(),60)).rejects.toThrow('Existing manual mode');expect((await d.sample()).fanLevel).toBe(40);await d.auto()})

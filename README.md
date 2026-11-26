@@ -9,7 +9,7 @@
 
 面向家庭服务器、个人工作室及小型办公室的服务器智能散热管理项目。采用 Nuxt + Vue SPA、Nitro 后台任务、Bun 与 SQLite；浏览器关闭后监控仍独立运行。硬件驱动与温控策略通过统一插件接口解耦。
 
-**当前版本为公开 Alpha 安全预览，并非生产级风扇控制器。** 当前物理硬件驱动不执行真实写入；真实 ADAPTIVE 暂不可启用。请维持 BMC 原厂 AUTO。Mock 驱动可模拟自适应调速、有限手动租约和故障回退。
+**当前版本为公开 Alpha 安全预览，并非生产级风扇控制器。** Local IPMI 仍只读；iMana 200 SSH 支持显式启用的实验 ADAPTIVE（限定固件/主板、硬件健康、有限租约及读回）。默认 MONITOR；真实调速须现场监督验收。
 
 ### 功能
 
@@ -182,7 +182,7 @@ GitHub Actions 验证 Nuxt 构建、单文件独立运行和 Docker 容器；版
 
 HomeServer Fan Control is an open-source cooling-management project for home servers, studios and small offices. It combines a Nuxt/Vue SPA, persistent Nitro background scheduler, Bun and SQLite. Monitoring is independent of the browser; a shared plugin interface separates hardware transports from control policy.
 
-**This is a public alpha safety preview, not a production-ready fan controller.** Physical hardware writes are currently disabled. Keep factory BMC cooling in AUTO. Only the Mock driver supports virtual adaptive control, timed leases and fallback.
+**This is a public alpha safety preview, not a production-ready fan controller.** Local IPMI remains read-only; iMana 200 SSH supports explicit experimental ADAPTIVE for the recorded firmware/board, with health gates, finite leases and readback. Default MONITOR; supervise physical tests.
 
 ### Features
 
