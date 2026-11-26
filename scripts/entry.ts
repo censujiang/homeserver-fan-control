@@ -9,8 +9,14 @@ if(process.argv.includes('--plugin-worker')){
  const result=await plugin.sample(input.mode,input.config)
  process.stdout.write(JSON.stringify(result))
 }else{
- process.env.NITRO_HOST ??= process.env.HOST ?? '127.0.0.1'
- process.env.NITRO_PORT ??= process.env.PORT ?? '3000'
+ const {parseArgs,help}=await import('./cli')
+ try{
+  const cfg=parseArgs(process.argv.slice(2),process.env)
+  if(cfg.help){console.log(help);process.exit(0)}
+  process.env.NITRO_HOST=cfg.host
+  process.env.NITRO_PORT=String(cfg.port)
+  process.env.HSFC_DATA_DIR=cfg.dataDir
+ }catch(e){console.error((e as Error).message);console.error(help);process.exit(2)}
  // @ts-expect-error Nitro output is generated during production build.
  await import('../.output/server/index.mjs')
 }

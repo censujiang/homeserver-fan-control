@@ -18,8 +18,8 @@ Unverified / incomplete:
 - UI policy editing is JSON, not an interactive curve; history is a list, not a chart.
 - Polling is used instead of push. Linux auxiliary monitoring, backups via UI, explicit
   connection test, policy CRUD, audit coverage, configurable retention remain incomplete.
-- Lockfile, type checking, lint, build, smoke test and target CPU support require verification.
-- Do not tag or publish production releases before the full acceptance suite passes.
+- Lockfile and actual target CPU support require verification. Earlier CI passed type checking, lint, six tests, build, compile and standalone smoke test.
+- Public alpha releases are allowed; never advertise them as production-ready before full acceptance.
 
 ## Hardware safety gate
 Keep factory AUTO. Capture real SSH and IPMI output without secrets.

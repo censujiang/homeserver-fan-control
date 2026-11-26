@@ -1,0 +1,18 @@
+services:
+  fan-control:
+    build: .
+    image: homeserver-fan-control:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HSFC_HOST_PORT:-3000}:3000"
+    volumes:
+      - hsfc-data:/data
+    security_opt:
+      - no-new-privileges:true
+    # Local IPMI only, after verifying the host device and group:
+    # devices:
+    #   - /dev/ipmi0:/dev/ipmi0
+    # group_add:
+    #   - "REPLACE_WITH_HOST_DEVICE_GID"
+volumes:
+  hsfc-data:

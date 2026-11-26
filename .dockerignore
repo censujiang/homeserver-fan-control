@@ -1,0 +1,11 @@
+node_modules
+.nuxt
+.output
+.git
+data
+.env
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+**/config.key
+**/setup-token

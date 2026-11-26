@@ -1,0 +1,12 @@
+import {test,expect} from 'bun:test'
+import {parseArgs} from '../scripts/cli'
+test('default, environment and explicit CLI precedence',()=>{
+ expect(parseArgs([])).toEqual({help:false,host:'127.0.0.1',port:3000,dataDir:'./data'})
+ expect(parseArgs([],{PORT:'8080',NITRO_PORT:'8081'}).port).toBe(8081)
+ expect(parseArgs(['--port=9000','-H','0.0.0.0','--data-dir','/var/lib/hsfc'],{NITRO_PORT:'8081'})).toEqual({help:false,host:'0.0.0.0',port:9000,dataDir:'/var/lib/hsfc'})
+})
+test('short flags, help and invalid options',()=>{
+ expect(parseArgs(['-p','8080']).port).toBe(8080)
+ expect(parseArgs(['--help']).help).toBe(true)
+ for(const args of [['--port','0'],['--port','65536'],['--port','abc'],['--port'],['--unknown'],['--host=']])expect(()=>parseArgs(args)).toThrow()
+})
