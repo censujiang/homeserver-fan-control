@@ -35,7 +35,7 @@ test "$(./app --version)" = "$version"
 test "$(curl -s -o /dev/stderr -w '%{http_code}' http://127.0.0.1:18765/api/autostart/status)" = 401
 curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18765/api/autostart/status | python3 -c 'import sys,json;x=json.load(sys.stdin);assert x["state"] in ("enabled","disabled","unknown")'
 test "$(curl -s -o /dev/stderr -w '%{http_code}' http://127.0.0.1:18765/api/update/status)" = 401
-curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18765/api/update/status | python3 -c 'import sys,json;x=json.load(sys.stdin);assert x["deployment"]=="binary" and x["current"]==sys.argv[1]' "$version"
+curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18765/api/update/status | python3 -c 'import sys,json;x=json.load(sys.stdin);assert x["deployment"]=="binary" and x["current"]==sys.argv[1] and x["canInstall"] is True' "$version"
 curl -fsS -H "Authorization: Bearer $session" -H 'Content-Type: application/json' -d '{"name":"Smoke test","plugin":"mock","transport":"mock","mode":"DRY_RUN","config":{},"policy":{"sensors":[{"id":"cpu","warm":40,"hot":65}],"fans":["fan"]}}' http://127.0.0.1:18765/api/instances
 sleep 7
 curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18765/api/dashboard | grep -q '"online":true'
@@ -45,3 +45,26 @@ for i in $(seq 1 30); do if curl -fsS http://127.0.0.1:18765/api/auth/status >st
 grep -q '"setup":false' status.json
 session=$(curl -fsS -H 'Content-Type: application/json' -d '{"password":"test-password-1234"}' http://127.0.0.1:18765/api/auth/login | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
 curl -fsS -H "Authorization: Bearer $session" http://127.0.0.1:18765/api/dashboard | grep -q 'Smoke test'
+
+# Exercise supervisor rollback with a verified, intentionally non-starting candidate.
+mkdir -p data/updates
+tag=v99.0.0
+candidate="data/updates/$tag-homeserver-fan-control-linux-x64-baseline"
+printf '%s\n' '#!/bin/sh' 'if [ "$1" = --version ]; then echo 99.0.0; exit 0; fi' 'exit 1' > "$candidate"
+chmod 600 "$candidate"
+request=$(find data -maxdepth 2 -type d -name '.supervisor-*' -print -quit)/request.json
+test -n "$request"
+python3 - "$candidate" "$request" "$tag" <<'PY'
+import hashlib,json,os,sys
+candidate,request,tag=sys.argv[1:]
+content=open(candidate,'rb').read()
+with open(request+'.tmp','w') as f: json.dump(dict(tag=tag,size=len(content),sha256=hashlib.sha256(content).hexdigest()),f)
+os.replace(request+'.tmp',request)
+PY
+for i in $(seq 1 90); do
+ if test -f data/update-result.json && grep -q '"status":"rolled-back"' data/update-result.json && curl -fsS http://127.0.0.1:18765/api/auth/status >status.json; then break; fi
+ sleep 1
+done
+grep -q '"status":"rolled-back"' data/update-result.json
+test "$(./app --version)" = "$version"
+grep -q '"setup":false' status.json

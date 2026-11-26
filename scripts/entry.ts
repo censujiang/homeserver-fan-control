@@ -19,10 +19,11 @@ if(process.argv.includes('--plugin-worker')){
   const {resolve}=await import('node:path')
   process.env.HSFC_STARTUP_ENTRY=resolve(process.argv[1]??'scripts/entry.ts')
  }
+ const serving=process.argv[2]==='--serve'
  const startupAction=['--enable-autostart','--autostart-status','--generate-autostart-script'].includes(process.argv[2]??'')?process.argv[2]:undefined
  const {parseArgs,help}=await import('./cli')
  try{
-  const cfg=parseArgs(process.argv.slice(startupAction?3:2),process.env)
+  const cfg=parseArgs(process.argv.slice(startupAction||serving?3:2),process.env)
   if(cfg.help){console.log(help);process.exit(0)}
   process.env.NITRO_HOST=cfg.host
   process.env.NITRO_PORT=String(cfg.port)
@@ -41,6 +42,9 @@ if(process.argv.includes('--plugin-worker')){
    if(startupAction==='--enable-autostart'&&s.state!=='enabled')process.exitCode=1
    }
   }catch(e){console.error((e as Error).message);process.exitCode=1}
+ }else if(!serving&&process.env.HSFC_DEPLOYMENT==='binary'&&process.platform==='linux'&&process.env.HSFC_NO_SUPERVISOR!=='1'){
+  const {supervise}=await import('./supervisor')
+  await supervise()
  }else{
   try{
    const {generateAutostartScript}=await import('../server/core/autostart')

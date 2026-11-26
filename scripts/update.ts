@@ -17,12 +17,12 @@ export async function updateCli(args:string[],compiled:boolean){
  const executable=await realpath(process.execPath),s=await lstat(executable)
  if(!s.isFile())throw new Error('Executable is not a regular file')
  const dir=dirname(executable),temp=await mkdtemp(join(dir,'.hsfc-update-'))
- const backup=executable+'.previous'
+ const backup=executable+'.previous-'+currentVersion+'-'+Date.now()
  try{
   const {file}=await downloadRelease(release,temp)
   await chmod(file,s.mode&0o777)
   // Preserve a previous executable before replacing the current pathname.
-  // Refuse to overwrite a symlink or stale backup; the operator can move it first.
+  // Versioned backups avoid blocking later updates.
   await copyFile(executable,backup,constants.COPYFILE_EXCL)
   await chmod(backup,s.mode&0o777)
   await rename(file,executable)

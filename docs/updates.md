@@ -6,7 +6,7 @@
 
 ### Web 管理后台
 
-管理员登录后进入「软件更新」，选择通道并检查更新。下载由服务器执行，显示进度；大小及 SHA-256 校验通过后保存至数据目录 updates/，不自动执行或重启。源码部署只检查版本。校验文件与发行附件来自同一 GitHub Release，并非独立数字签名；请信任本项目的 GitHub 发行账户及 HTTPS。
+管理员登录后进入「软件更新」，选择通道并检查更新。下载由服务器执行，显示进度；大小及 SHA-256 校验通过后保存至数据目录 updates/。alpha.10 起，独立二进制在监督进程中运行，点击「安装并自动重启」后保留版本化二进制备份及冷 SQLite 备份，原子替换、启动并检查新版 HTTP 健康。失败时尝试恢复旧二进制；如数据库不兼容需手工恢复备份。浏览器自动等待并刷新，登录会话失效需重新登录。先将物理 ADAPTIVE 控制切换至 MONITOR。必须由当前用户拥有程序及所在目录并可写，不能自动提权。Docker 和源码不自动安装。源码部署只检查版本。校验文件与发行附件来自同一 GitHub Release，并非独立数字签名；请信任本项目的 GitHub 发行账户及 HTTPS。
 
 ### 独立二进制
 
@@ -17,7 +17,7 @@
 ./homeserver-fan-control-linux-x64-baseline --update
 ```
 
-可附加 --stable 或 --preview。命令会重新从官方 Release 下载和校验，原子替换当前可执行文件，保留 .previous；不会采用可能被本地修改的暂存文件，也不会自动启动进程。若使用 systemd：
+可附加 --stable 或 --preview。命令会重新从官方 Release 下载和校验，原子替换当前可执行文件，保留版本化 .previous-*；不会采用可能被本地修改的暂存文件，也不会自动启动进程。若使用 systemd：
 
 ```sh
 sudo systemctl stop homeserver-fan-control
@@ -25,7 +25,7 @@ sudo /usr/local/bin/homeserver-fan-control --update
 sudo systemctl start homeserver-fan-control
 ```
 
-如果更新失败，原程序保留（若已创建 .previous，请先另存再重试）。如果新版本启动失败，停止服务、将 .previous 恢复为原文件名、必要时恢复升级前数据备份，再启动。不要让 Web 服务拥有系统程序目录的写权限。升级期间保留 BMC 原厂 AUTO。
+如果更新失败，原程序保留（检查版本化备份）。如果新版本启动失败，停止服务、将对应的 .previous-* 恢复为原文件名、必要时恢复升级前数据备份，再启动。不要让 Web 服务拥有系统程序目录的写权限。升级期间保留 BMC 原厂 AUTO。
 
 ### Docker
 
@@ -35,10 +35,12 @@ Web 可以下载经过校验的 Docker 镜像归档到数据卷。使用宿主�
 
 The updater reads public GitHub Releases from this repository, without a token. Stable excludes prereleases; preview includes alpha/beta/RC. Alpha installations default to preview. It compares SemVer, accepts only newer compatible assets with SHA256SUMS, and requires connectivity to GitHub API and release CDN.
 
-Administrators can check and download updates in the Web UI. Size and SHA-256 are verified before saving to updates/ inside the data directory; monitoring continues and nothing is executed or restarted automatically. Source deployments only check versions. The checksum is published by the same release account, not an independent signature.
+Administrators can check and download updates in the Web UI. Size and SHA-256 are verified before saving to updates/ inside the data directory; monitoring continues during download. Since alpha.10 supervised standalone binaries support Install and restart automatically, with atomic replacement, versioned binary and cold SQLite backups, HTTP health checking and attempted binary rollback. Re-login after restart. Stop physical ADAPTIVE first. The executable and its directory must be owned and writable by the current user. Docker/source remain manual. Source deployments only check versions. The checksum is published by the same release account, not an independent signature.
 
-For standalone deployments, back up the data directory and stop the service first. Run the current binary with --check-update or --update, optionally --stable or --preview. The CLI downloads afresh from GitHub, verifies the asset, atomically replaces its own executable and keeps .previous. It never trusts a locally staged archive for privileged installation. Start the service manually. Move any existing .previous backup before the next update. If startup fails, stop the service, restore the previous binary and pre-upgrade data if necessary, then restart. Do not grant the Web service write access to system executable directories.
+For standalone deployments, back up the data directory and stop the service first. Run the current binary with --check-update or --update, optionally --stable or --preview. The CLI downloads afresh from GitHub, verifies the asset, atomically replaces its own executable and keeps a versioned .previous-* backup. It never trusts a locally staged archive for privileged installation. Start the service manually. Versioned backups do not block later updates. If startup fails, stop the service, restore the previous binary and pre-upgrade data if necessary, then restart. Do not grant the Web service write access to system executable directories.
 
 For Docker, export the verified archive from the data volume using docker cp, verify against the official Release SHA-256, load with docker load -i, then recreate the container with its original volume, ports and device permissions. Image tag: homeserver-fan-control:ci. Do not mount the Docker socket or self-update inside the container.
 
 [Project README](../README.md)
+
+监督进程在同一个 Screen/systemd 服务内保留，直到外层进程退出；更新后的 Web 子进程为新版本。监督协议变更或不兼容数据库迁移仍建议在维护窗口完整重启。alpha.9 及以前需要最后一次 CLI 更新才能获得此功能。

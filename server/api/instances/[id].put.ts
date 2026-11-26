@@ -1,3 +1,4 @@
+import {installing} from '../../core/update'
 import { authorize } from '../../core/auth'
 import { instances, saveInstance, event } from '../../core/db'
 import { plugins } from '../../core/registry'
@@ -17,6 +18,7 @@ export default defineEventHandler(async e=>{
  if((b.mode==='ADAPTIVE'&&b.plugin!=='mock'&&!(b.plugin==='huawei.imana200'&&b.transport==='ssh'&&b.config.control==='experimental'))||!plugin)throw createError({statusCode:409,statusMessage:'Unsupported mode or plugin'})
  try{const d=plugin.create(b.transport,b.config);await d.close()}catch{throw createError({statusCode:400,statusMessage:'Invalid driver configuration'})}
  await monitor.remove(id)
+ if(installing())throw createError({statusCode:503,statusMessage:'Update in progress'})
  const i={...b,id};saveInstance(i);monitor.add(i);event('Instance updated',id);return {ok:true}
  }finally{busy=false}
 })

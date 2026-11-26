@@ -7,7 +7,7 @@ cp dist/homeserver-fan-control "$tmp/app"
 cd "$tmp"
 qemu-x86_64 -cpu IvyBridge ./app --version >version.txt
 test "$(cat version.txt)" = "$version"
-qemu-x86_64 -cpu IvyBridge ./app --host 127.0.0.1 --port 18768 --data-dir "$tmp/data" >log 2>&1 & pid=$!
+HSFC_NO_SUPERVISOR=1 qemu-x86_64 -cpu IvyBridge ./app --host 127.0.0.1 --port 18768 --data-dir "$tmp/data" >log 2>&1 & pid=$!
 ready=0
 for i in $(seq 1 90); do
   if curl -fsS http://127.0.0.1:18768/api/auth/status >status.json; then ready=1; break; fi

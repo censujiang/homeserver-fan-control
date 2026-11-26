@@ -1,10 +1,9 @@
-## v0.3.0-alpha.9 — Experimental iMana SSH control / iMana SSH 实验调速
+## v0.3.0-alpha.10 — Web self-update / 网页自更新
 
-- Implement explicit experimental SSH ADAPTIVE for iMana 7.38, board 0xaa09, verified serial identity and pinned SSH key.
-- Parse actual health and fan mode/level/remaining-time replies (including values without a percent sign).
-- Mandatory two CPU DTS, inlet and eight rotor guards; 30–100% target, finite 30-second leases, readback, fallback and fault latch.
-- UI capability/mode indicators and Stop control / AUTO action. Default remains MONITOR.
-- Local IPMI remains read-only: legacy OEM write protocol and timeout have not been verified.
-- Unit tests use recorded reply formats; physical repeated lease renewal/load testing still pending.
+- Supervised Linux standalone process supports verified Web installation and automatic restart, including foreground, Screen and systemd launches.
+- Revalidate staged binary, check candidate version, preserve versioned executable and cold SQLite backups, replace atomically, verify restarted HTTP version, attempt binary rollback on failure.
+- Browser waits and reloads; sign in again after restart. Stop physical ADAPTIVE control before installing. No privilege escalation or Docker socket.
+- CLI uses versioned backups; older releases require one final manual transition to this supervisor-capable version.
+- Docker and source installation remain manual. Legacy CPU test continues to exercise the actual serving binary; physical updates and repeated iMana lease testing still need real-host validation.
 
-默认不接管真实硬件。请先使用 MONITOR/DRY_RUN，在现场监护下测试。仅 30% 和单次 30 秒回退已有实机依据；不保证连续续期或负载表现。保留原有数据目录。
+保留数据目录。自动回滚只保证尝试恢复旧二进制，数据库不兼容时需使用冷备份恢复；不要将生产系统暴露至不可信网络。

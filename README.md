@@ -144,7 +144,7 @@ Environment=NITRO_HOST=127.0.0.1
 
 ### 在线更新
 
-在 Web 后台的「软件更新」中选择稳定版或含预发行版通道，检查 GitHub Releases，并按部署类型下载匹配的发行附件。后台验证文件大小与 SHA-256，不会自动执行、替换程序或停止散热监控。
+在 Web 后台的「软件更新」中选择稳定版或含预发行版通道，检查 GitHub Releases，并按部署类型下载匹配的发行附件。后台验证文件大小与 SHA-256，下载过程不停止监控。alpha.10+ 独立二进制支持点击安装并自动重启，详见在线更新指南；Docker/源码仍手动更新。
 
 独立二进制可在终端检查更新：
 
@@ -152,7 +152,7 @@ Environment=NITRO_HOST=127.0.0.1
 ./homeserver-fan-control-linux-x64-baseline --check-update
 ```
 
-先停止原服务并备份数据，再使用原运行文件执行 `--update`（安装至系统目录时需有目录写权限）。新文件原子替换旧文件，旧版本保留为 `.previous`，请手动启动服务。若已有 `.previous`，请先移走保存，避免覆盖旧备份。Docker 从宿主机导入新镜像后用同一数据卷重建容器；源码部署重新构建。参见[在线更新指南](docs/updates.md)。
+先停止原服务并备份数据，再使用原运行文件执行 `--update`（安装至系统目录时需有目录写权限）。新文件原子替换旧文件，旧版本保留为版本化 `.previous-*`，请手动启动服务。版本化备份不会阻塞后续更新。Docker 从宿主机导入新镜像后用同一数据卷重建容器；源码部署重新构建。参见[在线更新指南](docs/updates.md)。
 
 ### 数据管理及升级
 
@@ -308,13 +308,13 @@ Restart the service. Grant local device access separately, following the selecte
 
 ### Online updates
 
-Open Software updates in the Web UI, select the stable or preview channel, check GitHub Releases and download the matching deployment asset. The server verifies its size and SHA-256. It does not execute the download, replace the running application or stop cooling monitoring automatically.
+Open Software updates in the Web UI, select the stable or preview channel, check GitHub Releases and download the matching deployment asset. The server verifies its size and SHA-256. Download does not interrupt monitoring. Alpha.10+ supervised standalone binaries support install and automatic restart; Docker/source remain manual.
 
 ```sh
 ./homeserver-fan-control-linux-x64-baseline --check-update
 ```
 
-Stop the service and back up data first, then run the current binary with `--update` (write permission to its directory is required). The binary is atomically replaced and the old executable retained as `.previous`; restart manually. Move an existing backup away before updating again. Docker deployments load the new image on the host and recreate the container with the same data volume; source deployments rebuild. See the [update guide](docs/updates.md).
+Stop the service and back up data first, then run the current binary with `--update` (write permission to its directory is required). The binary is atomically replaced and the old executable retained as a versioned `.previous-*`; restart manually. Versioned backups do not block later updates. Docker deployments load the new image on the host and recreate the container with the same data volume; source deployments rebuild. See the [update guide](docs/updates.md).
 
 ### Persistence, backup and upgrade
 

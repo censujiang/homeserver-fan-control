@@ -16,8 +16,30 @@ const healthLabel=(h:string)=>h==='ok'?text('正常','OK'):h==='fault'?text('异
 function shownSensors(i:PublicInstance,kinds:string[]){const q=sensorFilter.value.trim().toLowerCase();return (i.live.sample?.sensors??[]).filter(s=>kinds.includes(s.kind)&&(!q||s.name.toLowerCase().includes(q)))}
 function sensorValue(s:{kind:string;value:number|null}){return s.value===null?'—':s.kind==='discrete'?'0x'+s.value.toString(16).toUpperCase():String(s.value)}
 const form=reactive({id:'',name:'',plugin:'mock',transport:'mock',mode:'MONITOR',enabled:true,config:{} as Record<string,unknown>,policy:JSON.stringify(defaultPolicy,null,2)})
+const updateWaiting=ref(''), updateOutcome=ref(''), updateDeadline=ref(0)
 const update=ref<UpdateStatus>(), channel=ref<Channel>('preview'), updateBusy=ref(false), updateError=ref('')
-async function refreshUpdate(){if(!token.value||tab.value!=='updates')return;try{update.value=await $fetch<UpdateStatus>('/api/update/status',{headers:auth()})}catch{updateError.value=text('读取更新状态失败','Could not load update status')}}
+async function refreshUpdate(){
+ if(updateWaiting.value){
+  if(token.value)try{update.value=await $fetch<UpdateStatus>('/api/update/status',{headers:auth(),timeout:2500})}catch{/* restarting */}
+  try{const s=await $fetch<{version?:string;updateResult?:{tag:string;status:string}}>('/api/auth/status',{timeout:2500})
+   if(s.updateResult?.tag===updateWaiting.value&&['success','failed','rolled-back'].includes(s.updateResult.status)){
+    sessionStorage.setItem('updateOutcome',s.updateResult.status);sessionStorage.removeItem('updateWaiting');sessionStorage.removeItem('updateDeadline');sessionStorage.removeItem('token');location.reload();return
+   }
+  }catch{/* expected disconnect during restart */}
+  if(Date.now()>updateDeadline.value){updateWaiting.value='';sessionStorage.removeItem('updateWaiting');sessionStorage.removeItem('updateDeadline');updateError.value=text('等待重启超时，请检查服务器日志。','Restart timed out; inspect server logs.')}
+  return
+ }
+ if(!token.value||tab.value!=='updates')return;try{update.value=await $fetch<UpdateStatus>('/api/update/status',{headers:auth()})}catch{updateError.value=text('读取更新状态失败','Could not load update status')}}
+async function installUpdate(download=false){
+ const tag=update.value?.latest?.tag
+ if(!tag||!confirm(text('下载、校验并安装新版本，然后自动重启？请先停止真实硬件 ADAPTIVE 控制。','Download, verify, install and restart automatically? Stop physical ADAPTIVE control first.')))return
+ updateBusy.value=true;updateError.value=''
+ try{
+  await $fetch(download?'/api/update/download':'/api/update/install',{method:'POST',headers:auth(),body:{tag,...(download?{autoInstall:true}:{})}})
+  updateWaiting.value=tag;updateDeadline.value=Date.now()+420000;sessionStorage.setItem('updateWaiting',tag);sessionStorage.setItem('updateDeadline',String(updateDeadline.value))
+ }catch(e){updateError.value=(e as Error).message}
+ finally{updateBusy.value=false}
+}
 async function updateAction(check:boolean){updateBusy.value=true;updateError.value='';try{
  if(check)update.value=await $fetch<UpdateStatus>('/api/update/check',{method:'POST',headers:auth(),body:{channel:channel.value}})
  else if(update.value?.latest)update.value=await $fetch<UpdateStatus>('/api/update/download',{method:'POST',headers:auth(),body:{tag:update.value.latest.tag}})
@@ -64,7 +86,7 @@ const manifest=computed(()=>dash.value?.plugins.find(p=>p.id===form.plugin))
 const fields=computed(()=>manifest.value?.modes.find(m=>m.id===form.transport)?.fields??[])
 const auth=()=>({Authorization:'Bearer '+token.value})
 async function refresh(){
- if(!token.value)return
+ if(!token.value||updateWaiting.value)return
  try{dash.value=await $fetch<Dashboard>('/api/dashboard',{headers:auth()})}
  catch(e){if((e as {statusCode?:number}).statusCode===401){token.value='';sessionStorage.removeItem('token')}else error.value=text('读取失败','Refresh failed')}
 }
@@ -100,12 +122,13 @@ async function stopControl(i:PublicInstance){
 async function remove(id:string){if(!confirm(text('删除此服务器配置？','Remove this server?')))return;await action(async()=>{await $fetch('/api/instances/'+id,{method:'DELETE',headers:auth()});await refresh()})}
 async function readHistory(){if(!historyId.value)return;await action(async()=>{history.value=await $fetch('/api/history',{headers:auth(),query:{id:historyId.value,from:Date.now()-86400000}})})}
 let timer:ReturnType<typeof setInterval>|undefined
-onMounted(async()=>{reset();showEditor.value=false;token.value=sessionStorage.getItem('token')??'';dark.value=matchMedia('(prefers-color-scheme: dark)').matches;const s=await $fetch<{setup:boolean;allowed:boolean}>('/api/auth/status');needsSetup.value=s.setup;setupAllowed.value=s.allowed;await refresh();timer=setInterval(()=>{void refresh();void refreshUpdate()},5000)})
+onMounted(async()=>{updateWaiting.value=sessionStorage.getItem('updateWaiting')??'';updateDeadline.value=Number(sessionStorage.getItem('updateDeadline')??0);updateOutcome.value=sessionStorage.getItem('updateOutcome')??'';sessionStorage.removeItem('updateOutcome');reset();showEditor.value=false;token.value=sessionStorage.getItem('token')??'';dark.value=matchMedia('(prefers-color-scheme: dark)').matches;const s=await $fetch<{setup:boolean;allowed:boolean}>('/api/auth/status');needsSetup.value=s.setup;setupAllowed.value=s.allowed;await refresh();timer=setInterval(()=>{void refresh();void refreshUpdate()},5000)})
 onBeforeUnmount(()=>clearInterval(timer))
 </script>
 <template>
  <main :class="{dark}">
   <header><div><small>HOMESERVER / CONTROL</small><h1>{{text('智能散热管理','Fan Control')}}</h1></div><div class="actions"><button @click="lang=lang==='zh'?'en':'zh'">{{lang==='zh'?'EN':'中文'}}</button><button @click="dark=!dark">{{dark?'☀':'☾'}}</button><button v-if="token" @click="signOut">{{text('退出','Sign out')}}</button></div></header>
+  <div v-if="updateWaiting" role="status" class="warning">{{text('正在下载、校验或安装新版，服务恢复后页面会自动刷新。','Downloading, verifying or installing. This page will refresh when the service returns.')}}</div><div v-if="updateOutcome" role="status" class="warning">{{updateOutcome==='success'?text('更新完成，请重新登录。','Update complete; sign in again.'):text('更新未成功，请检查日志；若已替换程序，将尝试恢复旧版本。','Update unsuccessful. Check logs; rollback is attempted if the binary was replaced.')}}</div>
   <div v-if="error" role="alert" class="warning">{{error}}</div>
   <section v-if="!token" class="login">
    <h2>{{needsSetup?text('欢迎使用 · 创建管理员','Welcome · Create administrator'):text('管理员登录','Administrator login')}}</h2>
@@ -169,16 +192,16 @@ onBeforeUnmount(()=>clearInterval(timer))
    <section v-if="tab==='updates'">
     <h2>{{text('软件更新','Software updates')}}</h2>
     <article><p>{{text('当前版本','Installed version')}}: <strong>{{update?.current??'—'}}</strong> · {{update?.deployment??'—'}}</p>
-     <div class="actions"><label>{{text('更新通道','Update channel')}}<select v-model="channel" :disabled="updateBusy||update?.state==='downloading'"><option value="stable">{{text('稳定版','Stable')}}</option><option value="preview">{{text('含预发行版','Include previews')}}</option></select></label><button :disabled="updateBusy||update?.state==='downloading'" @click="updateAction(true)">{{text('检查更新','Check for updates')}}</button></div>
+     <div class="actions"><label>{{text('更新通道','Update channel')}}<select v-model="channel" :disabled="updateBusy||!!updateWaiting||update?.state==='downloading'||update?.state==='installing'"><option value="stable">{{text('稳定版','Stable')}}</option><option value="preview">{{text('含预发行版','Include previews')}}</option></select></label><button :disabled="updateBusy||update?.state==='downloading'" @click="updateAction(true)">{{text('检查更新','Check for updates')}}</button></div>
      <p v-if="updateError" role="alert">{{updateError}}</p><p v-if="update?.checkedAt"><small>{{text('检查时间','Last checked')}}: {{new Date(update.checkedAt).toLocaleString()}}</small></p>
      <p v-if="update?.checkedAt&&!update.latest">{{text('没有更新的兼容版本。','No newer compatible release.')}}</p>
      <template v-if="update?.latest"><h3>{{update.latest.tag}}</h3><p>{{(update.latest.size/1048576).toFixed(1)}} MiB · {{update.latest.prerelease?'Pre-release':'Stable'}}</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">{{update.latest.notes}}</pre><a :href="update.latest.url" target="_blank" rel="noopener noreferrer">{{text('发行说明及手动下载','Release notes and manual download')}}</a>
-      <div v-if="update.deployment!=='source'"><button :disabled="updateBusy||update.state==='downloading'" @click="updateAction(false)">{{text('下载并校验更新','Download and verify update')}}</button></div>
+      <div v-if="update.deployment!=='source'" class="actions"><button v-if="update.canInstall&&update.state!=='ready'" class="primary" :disabled="updateBusy||!!updateWaiting||update.state==='downloading'||update.state==='installing'" @click="installUpdate(true)">{{text('一键更新并重启','Update and restart')}}</button><button :disabled="updateBusy||!!updateWaiting||update.state==='downloading'||update.state==='installing'" @click="updateAction(false)">{{text('下载并校验更新','Download and verify update')}}</button></div>
       <div v-if="update.state==='downloading'"><progress :value="update.downloaded" :max="update.total"></progress><p>{{(update.downloaded/1048576).toFixed(1)}} / {{(update.total/1048576).toFixed(1)}} MiB</p></div>
       <p v-if="update.state==='failed'" role="alert">{{update.error}}</p>
-      <p v-if="update.state==='ready'">{{text('已通过 SHA-256 校验，保存在服务器：','SHA-256 verified; saved on server:')}} <code>{{update.file}}</code></p>
+      <button v-if="update.state==='ready'&&update.canInstall" class="primary" :disabled="updateBusy||!!updateWaiting" @click="installUpdate(false)">{{text('安装并自动重启','Install and restart automatically')}}</button><p v-if="update.state==='ready'">{{text('已通过 SHA-256 校验，保存在服务器：','SHA-256 verified; saved on server:')}} <code>{{update.file}}</code></p>
      </template>
-     <p v-if="update?.deployment==='binary'">{{text('下载不会停止监控或替换正在运行的程序。停止服务后在终端执行当前二进制 --update，再手动启动。旧程序保留为 .previous。','Downloading does not stop monitoring or replace the running program. Stop the service, run the current executable with --update, then start it manually. The previous executable is retained as .previous.')}}</p>
+     <p v-if="update?.deployment==='binary'">{{text('下载验证后点击安装并自动重启。独立二进制监督进程负责替换和健康检查；失败尝试恢复旧程序，保留版本化备份。若安装按钮不可用，请检查部署权限或使用 CLI。','After verification, select Install and restart automatically. The supervisor replaces the binary, checks health and attempts rollback on failure; versioned backups are retained. If unavailable, check deployment permissions or use the CLI.')}}</p>
      <p v-else-if="update?.deployment==='docker'">{{text('请在宿主机导入新镜像并使用原数据卷重建容器；容器不应自行替换程序。','Load the new image on the host and recreate the container with the same data volume; containers must not replace their own executable.')}}</p>
      <p v-else>{{text('源码部署请更新 Git 仓库并重新构建。','For source deployments, update the repository and rebuild.')}}</p>
      <a :href="releasePage" target="_blank" rel="noopener noreferrer">GitHub Releases</a>

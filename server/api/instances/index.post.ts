@@ -1,3 +1,4 @@
+import {installing} from '../../core/update'
 import { authorize } from '../../core/auth'
 import { instances, saveInstance, event } from '../../core/db'
 import { plugins } from '../../core/registry'
@@ -13,6 +14,7 @@ export default defineEventHandler(async e=>{
  if(!plugin)throw createError({statusCode:400,statusMessage:'Unknown plugin'})
  try{const d=plugin.create(b.transport,b.config);await d.close()}catch{throw createError({statusCode:400,statusMessage:'Invalid driver configuration'})}
  if(instances().length>=32)throw createError({statusCode:409,statusMessage:'Instance limit reached'})
+ if(installing())throw createError({statusCode:503,statusMessage:'Update in progress'})
  const i={...b,id:crypto.randomUUID()}
  saveInstance(i);monitor.add(i);event('Instance added',i.id);return {id:i.id}
 })

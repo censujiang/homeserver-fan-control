@@ -60,7 +60,7 @@ async function currentService(){
   const user=names.some(x=>/^user@\d+\.service$/.test(x))
   const flags=user?['--user']:[]
   const p=await run(systemctl,[...flags,'show',unit,'--property=MainPID','--value'])
-  if(p.code===0&&Number(p.out)===process.pid)return {unit,user,flags}
+  if(p.code===0&&(Number(p.out)===process.pid||(process.env.HSFC_SUPERVISOR_PID===String(process.ppid)&&Number(p.out)===process.ppid)))return {unit,user,flags}
  }
  return null
 }
