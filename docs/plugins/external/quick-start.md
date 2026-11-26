@@ -50,9 +50,12 @@ ls -l /sys/class/hwmon
 适用于 BMC 有独立管理网络，或应用部署在虚拟机/其他机器。先从可靠渠道验证主机公钥指纹；再测试正常认证和交互方式。
 
 ```sh
-ssh-keyscan -p 22 <BMC_IP> > bmc-hostkey.pub
+BMC_IP=192.0.2.10  # replace with your authorized BMC address
+BMC_USER=operator  # replace with your username
+ssh-keyscan -p 22 "$BMC_IP" > bmc-hostkey.pub
 ssh-keygen -lf bmc-hostkey.pub -E sha256
-ssh -p 22 -o StrictHostKeyChecking=yes <USER>@<BMC_IP>
+# Only after independent fingerprint verification and known_hosts enrollment:
+ssh -p 22 -o StrictHostKeyChecking=yes "$BMC_USER@$BMC_IP"
 ```
 
 ssh-keyscan 的结果本身不可信：需与设备控制台、厂商界面或已知可信指纹独立比对，再将核验过的密钥加入 known_hosts。不要使用 StrictHostKeyChecking=no。不要把密码写入命令行。进入设备 CLI 后，先查看厂商文档支持的 help / ? / version、设备身份、传感器、风扇模式等只读命令；并确认 SSH Exec 是否支持，还是必须保持 PTY 交互式 Shell。记录提示符、分页、回显、编码、超时、断连、认证失败等。对 Huawei iMana 200 可参考[内置插件指南](../builtin/huawei-imana-200.md)的已知限制，不能把其命令直接套用其他设备。

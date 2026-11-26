@@ -36,7 +36,10 @@ const startupReason=(s:AutostartStatus)=>{
 }
 async function refreshStartup(){if(!token.value)return;startupBusy.value=true;startupError.value='';try{startup.value=await $fetch<AutostartStatus>('/api/autostart/status',{headers:auth()})}catch{startupError.value=text('检测失败，请重试。','Detection failed; please retry.')}finally{startupBusy.value=false}}
 async function enableStartup(){if(!confirm(text('启用开机自启动？不会立即启动第二个实例或重启当前程序。','Enable boot startup? This will not start a second instance or restart the current process.')))return;startupBusy.value=true;startupError.value='';try{startup.value=await $fetch<AutostartStatus>('/api/autostart/enable',{method:'POST',headers:auth()})}catch{startupError.value=text('启用失败，请使用宿主机命令。','Enable failed; use host commands.')}finally{startupBusy.value=false}}
-async function copyStartup(){try{await navigator.clipboard.writeText(startup.value?.commands.join('\n')??'');startupCopied.value=true}catch{startupCopied.value=false}}
+async function copyStartup(){const value=startup.value?.commands.join('\n')??'';startupCopied.value=false;try{await navigator.clipboard.writeText(value);startupCopied.value=true}catch{
+ const area=document.createElement('textarea');area.value=value;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();try{startupCopied.value=document.execCommand('copy')}finally{area.remove()}
+ if(!startupCopied.value)startupError.value=text('浏览器不允许复制，请手动选中命令。','Clipboard unavailable; select the commands manually.')
+}}
 watch(token,v=>{if(v)void refreshStartup();else startup.value=undefined})
 watch(tab,v=>{if(v==='startup')void refreshStartup()})
 const installedPlugins=ref<Manifest[]>([])
@@ -139,7 +142,7 @@ onBeforeUnmount(()=>clearInterval(timer))
       <p>{{startupReason(startup)}}</p>
       <p v-if="startup.linger!==undefined">Linger: {{startup.linger?'enabled':'disabled'}}</p>
       <button v-if="startup.canEnable" :disabled="startupBusy" @click="enableStartup">{{text('一键设置开机自启','Enable boot startup')}}</button>
-      <p v-if="startup.commands.length">{{text('如果自动设置不可用，请在宿主机执行以下命令；Docker 请替换 <container> 为实际容器名。','If automatic setup is unavailable, run these commands on the host; replace <container> with the actual Docker container name.')}}</p>
+      <p v-if="startup.commands.length">{{text('如果自动设置不可用，请在宿主机执行以下命令；Docker 请将 CONTAINER 改为实际容器名。','If automatic setup is unavailable, run these commands on the host; set CONTAINER to the actual Docker container name.')}}</p>
       <pre v-if="startup.commands.length" style="white-space:pre-wrap;overflow-wrap:anywhere">{{startup.commands.join('\n')}}</pre>
       <button v-if="startup.commands.length" @click="copyStartup">{{startupCopied?text('已复制','Copied'):text('复制命令','Copy commands')}}</button>
       <p>{{text('不会自动重启或立即启动重复实例。','No automatic restart or immediate duplicate instance is started.')}}</p>
