@@ -51,7 +51,7 @@ class Shell {
         ch.on('close',()=>{this.channel=undefined;this.fail(new Error('Shell closed'))})
         pending.then(()=>resolve(),reject)
       }))
-      c.connect({host:cfg.host,port:cfg.port,username:cfg.username,password:cfg.password,privateKey:cfg.privateKey,readyTimeout:cfg.timeout,hostVerifier:key=>{
+      c.connect({host:cfg.host,port:cfg.port,username:cfg.username,password:cfg.password,privateKey:cfg.privateKey,readyTimeout:cfg.timeout,hostVerifier:(key:Buffer)=>{
         const expected=Buffer.from(cfg.fingerprint.replace(/=+$/,'')), actual=Buffer.from('SHA256:'+createHash('sha256').update(key).digest('base64').replace(/=+$/,''))
         return expected.length===actual.length&&timingSafeEqual(expected,actual)
       }})
