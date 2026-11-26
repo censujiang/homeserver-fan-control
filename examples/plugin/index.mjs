@@ -1,0 +1,1 @@
+export async function sample(){const at=Date.now();return {at,identity:null,health:'unknown',sensors:[{id:'example',name:'Example',kind:'temperature',value:25,unit:'C',raw:'25',valid:true,health:'ok',at}]}}

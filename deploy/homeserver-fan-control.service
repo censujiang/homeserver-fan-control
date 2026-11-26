@@ -1,0 +1,23 @@
+[Unit]
+Description=HomeServer Fan Control (read-only preview)
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=homeserver-fan
+Group=homeserver-fan
+StateDirectory=homeserver-fan-control
+StateDirectoryMode=0700
+Environment=HSFC_DATA_DIR=/var/lib/homeserver-fan-control
+Environment=NITRO_HOST=127.0.0.1
+Environment=NITRO_PORT=3000
+ExecStart=/usr/local/bin/homeserver-fan-control
+Restart=on-failure
+TimeoutStopSec=90
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+UMask=0077
+[Install]
+WantedBy=multi-user.target
