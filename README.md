@@ -9,36 +9,37 @@
 
 面向家庭服务器、个人工作室及小型办公室的服务器智能散热管理项目。采用 Nuxt + Vue SPA、Nitro 后台任务、Bun 与 SQLite；浏览器关闭后监控仍独立运行。硬件驱动与温控策略通过统一插件接口解耦。
 
-**当前版本为公开 Alpha 安全预览，并非生产级风扇控制器。** Huawei iMana 200 的 SSH、本地 IPMI 驱动不执行真实硬件写入；真实 ADAPTIVE 暂不可启用。请维持 BMC 原厂 AUTO。Mock 驱动可模拟自适应调速、有限手动租约和故障回退。
+**当前版本为公开 Alpha 安全预览，并非生产级风扇控制器。** 当前物理硬件驱动不执行真实写入；真实 ADAPTIVE 暂不可启用。请维持 BMC 原厂 AUTO。Mock 驱动可模拟自适应调速、有限手动租约和故障回退。
 
 ### 功能
 
 - Web 管理后台：服务器管理、实时传感器状态、温控策略 JSON、历史采样、异常事件、中英文及亮暗主题。
-- iMana 200：远程 SSH 持久化交互式 Shell；本地 Linux OpenIPMI。
+- 内置与外置硬件插件，支持按插件选择连接方式。参见[内置插件目录](docs/plugins/builtin/README.md)。
 - SQLite WAL 持久化、管理员密码哈希、连接配置加密。
 - 外置 ZIP 插件安装、校验及管理；隔离执行是实验功能，默认关闭。
 - Linux x86_64 baseline 单文件、Docker 镜像、Compose、systemd。
 
-### 快速开始：独立二进制（推荐 PVE 宿主机）
+### 快速开始：独立二进制（推荐 Linux 裸金属 / 物理机）
 
-从 [Releases](https://github.com/censujiang/homeserver-fan-control/releases) 下载
-`homeserver-fan-control-linux-x64-baseline` 和 `SHA256SUMS`，将它们放在同一目录。
-仅下载一个发行文件时可使用：
+在 Linux x86_64 物理机上复制以下命令即可下载、校验并启动（需要 curl 和 sha256sum）。当前示例使用公开版本 v0.3.0-alpha.1，其他版本请查看 [Releases](https://github.com/censujiang/homeserver-fan-control/releases)。建议优先在被管理的裸金属 Linux 服务器运行；虚拟机或其他主机也可使用兼容的远程插件。
 
 ```sh
-grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c -
-chmod +x homeserver-fan-control-linux-x64-baseline
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.1
+curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
+curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
+grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
+chmod +x homeserver-fan-control-linux-x64-baseline && \
 ./homeserver-fan-control-linux-x64-baseline --port 8080
 ```
 
 默认只监听 127.0.0.1:3000。上例为 127.0.0.1:8080，无需安装 Bun、Node.js 或 npm。
-初次运行在数据目录（默认 `./data`）创建 `setup-token`。在运行用户下读取：
+初次运行在数据目录（默认 `./data`）创建 `setup-token`。在第二个终端以同一运行用户读取：
 
 ```sh
 cat ./data/setup-token
 ```
 
-通过本机浏览器或 SSH 端口转发访问 Web 界面，输入初始化密钥并设置至少 12 字符的密码。初始化完成后密钥文件会被删除。
+打开 http://127.0.0.1:8080（远程服务器可先运行 `ssh -L 8080:127.0.0.1:8080 user@server` 建立隧道），输入初始化密钥并设置至少 12 字符的密码。初始化完成后密钥文件会被删除。
 
 ### 启动参数与环境变量
 
@@ -62,11 +63,14 @@ PORT=18080 ./homeserver-fan-control-linux-x64-baseline
 
 **方式 A：下载已构建的发行镜像，不需要源码。**
 
-下载 Release 的 `homeserver-fan-control-docker-linux-amd64.tar.gz` 与 `SHA256SUMS`。
+复制以下命令下载发行镜像、校验并导入：
 
 ```sh
-grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c -
-docker load -i homeserver-fan-control-docker-linux-amd64.tar.gz
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.1
+curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
+curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
+grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
+docker load -i homeserver-fan-control-docker-linux-amd64.tar.gz && \
 docker run -d --name hsfc --restart unless-stopped \
   -p 127.0.0.1:8080:3000 \
   -v hsfc-data:/data \
@@ -97,38 +101,13 @@ docker compose logs -f
 
 `HSFC_HOST_PORT` 只改变宿主机端口。Compose 的 `command: ["--port", "9000"]` 可改变容器内部端口，同时将 ports 的目标端口改为 9000。数据卷默认保留；不要执行 `docker compose down -v`，除非确实需要删除数据。
 
-### 接入 Huawei iMana 200
+### 内置插件与硬件接入
 
-| 方式 | 适用场景 | 所需条件 |
-|---|---|---|
-| SSH | 远程设备、PVE 虚拟机、容器 | BMC 管理 IP、端口、用户名、密码或私钥、已独立核验的 SHA256 主机公钥指纹 |
-| Local IPMI | 被管理服务器的物理 Linux 宿主机 | /dev/ipmi0、/usr/bin/ipmitool、访问设备的最小权限 |
-| Mock | 无实机测试、演示 | 无硬件依赖 |
+请按硬件类型选择插件。各插件的连接配置、兼容性、设备权限及 Docker 硬件映射请参阅独立文档：
 
-SSH 不依赖本地 IPMI，也不需要 root。通过可靠渠道核验主机公钥指纹，不要盲目信任首次连接的指纹。
-
-本地 IPMI 示例（只读）：
-
-```sh
-ls -l /dev/ipmi0
-ipmitool -I open mc info
-ipmitool -I open sensor list
-stat -c '%g' /dev/ipmi0
-```
-
-容器方式需要额外映射真实设备并授予对应数字 GID，如：
-
-```sh
-docker run -d --name hsfc-ipmi \
-  --device /dev/ipmi0:/dev/ipmi0 \
-  --group-add "$(stat -c '%g' /dev/ipmi0)" \
-  -p 127.0.0.1:8080:3000 -v hsfc-ipmi-data:/data \
-  homeserver-fan-control:ci
-```
-
-设备权限需允许该组读写设备（IPMI 通信本身使用设备双向接口，即使应用不发控制写指令）。如果设备只允许 root 访问，请通过宿主机的适当设备权限规则配置专用组，不要使用 --privileged，也不要将设备开放给所有用户。PVE 虚拟机默认不拥有物理 BMC 设备，建议使用 SSH。
-
-目前实际 iMana 200 SSH 协议解析、身份/健康验证及持续控制租约仍需实机验收。本地 OEM 写入指令尚未验证。目标老款 Xeon 也需实测。
+- [内置插件目录](docs/plugins/builtin/README.md)
+- [Huawei iMana 200](docs/plugins/builtin/huawei-imana-200.md#简体中文)
+- Mock：无需硬件，适合演示及模拟测试。
 
 ### systemd / 长期运行
 
@@ -149,7 +128,7 @@ Environment=NITRO_PORT=8080
 Environment=NITRO_HOST=127.0.0.1
 ```
 
-保存后 `sudo systemctl restart homeserver-fan-control`。需要访问 IPMI 时单独配置设备组权限。
+保存后 `sudo systemctl restart homeserver-fan-control`。需要本地设备访问时，请参考所选插件文档配置最小权限。
 
 ### 数据管理及升级
 
@@ -179,28 +158,36 @@ GitHub Actions 验证 Nuxt 构建、单文件独立运行和 Docker 容器；版
 
 HomeServer Fan Control is an open-source cooling-management project for home servers, studios and small offices. It combines a Nuxt/Vue SPA, persistent Nitro background scheduler, Bun and SQLite. Monitoring is independent of the browser; a shared plugin interface separates hardware transports from control policy.
 
-**This is a public alpha safety preview, not a production-ready fan controller.** Physical Huawei iMana 200 fan writes are disabled in both SSH and local IPMI modes. Keep factory BMC cooling in AUTO. Only the Mock driver supports virtual adaptive control, timed leases and fallback.
+**This is a public alpha safety preview, not a production-ready fan controller.** Physical hardware writes are currently disabled. Keep factory BMC cooling in AUTO. Only the Mock driver supports virtual adaptive control, timed leases and fallback.
 
 ### Features
 
 - Web dashboard: instance management, current sensors, JSON policies, history and events; English/Chinese and dark/light themes.
-- iMana 200 interactive SSH transport and Linux OpenIPMI transport.
+- Built-in and external hardware plugins with selectable transports. See the [built-in plugin directory](docs/plugins/builtin/README.md).
 - SQLite WAL persistence, hashed administrator password and encrypted connection settings.
 - Validated ZIP plugin installation and management; isolated execution is experimental and disabled by default.
 - Linux x64 baseline standalone executable, Docker image, Compose and systemd.
 
-### Standalone executable (recommended on the physical PVE host)
+### Quick start: standalone executable (recommended on bare-metal Linux / physical machines)
 
-Download `homeserver-fan-control-linux-x64-baseline` and `SHA256SUMS` from [Releases](https://github.com/censujiang/homeserver-fan-control/releases).
+Copy these commands on a Linux x86_64 machine to download, verify and start the application (requires curl and sha256sum). The example uses public release v0.3.0-alpha.1; see [Releases](https://github.com/censujiang/homeserver-fan-control/releases) for other versions. Prefer the managed bare-metal Linux server; VMs and other hosts can also use compatible remote plugins.
 
 ```sh
-grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c -
-chmod +x homeserver-fan-control-linux-x64-baseline
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.1
+curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
+curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
+grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
+chmod +x homeserver-fan-control-linux-x64-baseline && \
 ./homeserver-fan-control-linux-x64-baseline --port 8080
+```
+
+In a second terminal (as the same user):
+
+```sh
 cat ./data/setup-token
 ```
 
-No Bun, Node.js, npm or separate front-end assets are required. The default binding is 127.0.0.1:3000; this example uses port 8080. Read the first-run setup token from the data directory and open the Web UI locally or via SSH port forwarding. Choose an administrator password of at least 12 characters. The setup token is removed after initialization.
+No Bun, Node.js, npm or separate front-end assets are required. The default binding is 127.0.0.1:3000; this example uses port 8080. Read the first-run setup token and open http://127.0.0.1:8080. For a remote server, first use `ssh -L 8080:127.0.0.1:8080 user@server`. Choose an administrator password of at least 12 characters. The setup token is removed after initialization.
 
 ### Command-line options and environment variables
 
@@ -222,11 +209,14 @@ Use a firewall and an HTTPS reverse proxy before exposing the service beyond loo
 
 ### Docker (Linux amd64)
 
-**Option A: load the published image archive.** Download the Docker archive and checksum file from Releases.
+**Option A: load the published image archive.** Copy the following commands to download, verify and load the release image.
 
 ```sh
-grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c -
-docker load -i homeserver-fan-control-docker-linux-amd64.tar.gz
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.1
+curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
+curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
+grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
+docker load -i homeserver-fan-control-docker-linux-amd64.tar.gz && \
 docker run -d --name hsfc --restart unless-stopped \
   -p 127.0.0.1:8080:3000 -v hsfc-data:/data \
   --security-opt no-new-privileges:true homeserver-fan-control:ci
@@ -255,27 +245,13 @@ docker compose logs -f
 
 Set HSFC_HOST_PORT to change the published host port. To change the internal port use `command: ["--port", "9000"]` and update the target port in ports. Keep the named volume; `docker compose down -v` deletes it.
 
-### Hardware transports
+### Built-in plugins and hardware setup
 
-| Transport | Use case | Requirements |
-|---|---|---|
-| SSH | Remote BMC, VM, container | BMC address, port, credentials and independently verified SHA256 host-key fingerprint |
-| Local IPMI | Physical Linux host | /dev/ipmi0, /usr/bin/ipmitool, restricted device access |
-| Mock | Demonstration and testing | No hardware dependencies |
+Choose the plugin for your hardware. See its dedicated guide for connection settings, compatibility, device permissions and Docker hardware mapping.
 
-SSH does not require local IPMI or root. Verify the fingerprint via a trusted channel, not merely the first SSH connection.
-
-For read-only local IPMI, check `ipmitool -I open mc info` and `ipmitool -I open sensor list`. In Docker, explicitly map the device and its numeric group:
-
-```sh
-docker run -d --name hsfc-ipmi \
-  --device /dev/ipmi0:/dev/ipmi0 \
-  --group-add "$(stat -c '%g' /dev/ipmi0)" \
-  -p 127.0.0.1:8080:3000 -v hsfc-ipmi-data:/data \
-  homeserver-fan-control:ci
-```
-
-Ensure the group has appropriate device permissions via a restricted host rule. Do not run the container privileged or grant world access to the device. A PVE VM normally cannot access the physical BMC device; prefer SSH. Exact SSH parsing and identity/health checks, repeated hardware leases, local OEM writes and target Xeon compatibility still require hardware validation.
+- [Built-in plugin directory](docs/plugins/builtin/README.md)
+- [Huawei iMana 200](docs/plugins/builtin/huawei-imana-200.md#english)
+- Mock: no hardware required; intended for demonstrations and simulation.
 
 ### systemd
 
@@ -294,7 +270,7 @@ Environment=NITRO_PORT=8080
 Environment=NITRO_HOST=127.0.0.1
 ```
 
-Restart the service. Grant local device access separately, only when needed.
+Restart the service. Grant local device access separately, following the selected plugin documentation.
 
 ### Persistence, backup and upgrade
 

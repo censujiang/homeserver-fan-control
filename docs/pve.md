@@ -1,4 +1,8 @@
-# PVE / Linux read-only monitoring
+# PVE / Linux monitoring (legacy reference)
+
+For current setup, see the [Huawei iMana 200 built-in plugin guide](plugins/builtin/huawei-imana-200.md) and [project README](../README.md). PVE is one deployment context, not the only recommended physical host.
+
+The original prototype notes below are retained for historical reference.
 
 Requires Bun or Node 22+, ipmitool, and permission to open /dev/ipmi0. Run from repository root:
 
