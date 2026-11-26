@@ -1,7 +1,8 @@
-## v0.3.0-alpha.11 — Legacy iMana SSH connectivity / 老款 iMana SSH 兼容性
+## v0.3.0-alpha.12 — Unified installer / 统一安装更新脚本
 
-- Enable password keyboard-interactive authentication for one non-echo password challenge.
-- Append legacy 2048-bit diffie-hellman-group14-sha1 as fallback to modern SSH algorithms; no group1 or host verification bypass.
-- Use explicit VT100 PTY, carriage return and strict iMana prompt matching.
-- Report SSH fingerprint, authentication, handshake, network, interactive-shell and sampling failures in monitoring and event history without exposing credentials; slow retries for auth/key/negotiation failures.
-- Keep physical writes opt-in; actual BMC SSH connectivity needs real-host verification.
+- Root-level install.sh selects standalone or Docker interactively and supports existing installations.
+- Correct SemVer ordering across paginated GitHub Releases, including out-of-order alpha.9/alpha.10/alpha.11; skip drafts and incomplete assets.
+- Download and verify SHA-256, preserve executable and data backups; restart verified systemd services or standard Docker containers. Existing Screen/foreground processes must be stopped before updating.
+- Default loopback bind; no Docker socket or automatic privilege escalation. Custom Docker/Compose deployments are deliberately not reconstructed.
+- Installer syntax and offline release-selection regression tests added to CI.
+- Retain alpha.11 SSH compatibility fixes and alpha.10 Web updater. Physical fan-control and full installer deployment tests remain pending.

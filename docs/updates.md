@@ -4,6 +4,14 @@
 
 更新来源固定为本项目公开 GitHub Releases；无需账号或 Token。稳定通道忽略预发行版本，预览通道包含 Alpha、Beta、RC。当前 Alpha 默认使用预览通道。比较 SemVer 版本而非发布时间，仅选择更新且包含匹配附件及 SHA256SUMS 的版本。需要服务器能够访问 api.github.com、github.com 及 GitHub 发行附件 CDN。
 
+### 统一远程安装和更新脚本
+
+```sh
+curl -fL --retry 2 https://raw.githubusercontent.com/censujiang/homeserver-fan-control/master/install.sh -o install.sh && bash install.sh
+```
+
+请先阅读脚本。默认预览通道，支持 --stable；按 SemVer 排序并检查分页附件。独立程序保留原数据目录，已核验运行中的 systemd 服务可自动重启；Screen/前台需先停止。标准 Docker 容器保留数据卷及端口，备份旧容器；特殊配置使用原部署定义。更新前确认 BMC AUTO，回滚仅恢复旧二进制或容器，数据库不兼容时需要手工恢复冷备份。详见 README 和 bash install.sh --help。
+
 ### Web 管理后台
 
 管理员登录后进入「软件更新」，选择通道并检查更新。下载由服务器执行，显示进度；大小及 SHA-256 校验通过后保存至数据目录 updates/。alpha.10 起，独立二进制在监督进程中运行，点击「安装并自动重启」后保留版本化二进制备份及冷 SQLite 备份，原子替换、启动并检查新版 HTTP 健康。失败时尝试恢复旧二进制；如数据库不兼容需手工恢复备份。浏览器自动等待并刷新，登录会话失效需重新登录。先将物理 ADAPTIVE 控制切换至 MONITOR。必须由当前用户拥有程序及所在目录并可写，不能自动提权。Docker 和源码不自动安装。源码部署只检查版本。校验文件与发行附件来自同一 GitHub Release，并非独立数字签名；请信任本项目的 GitHub 发行账户及 HTTPS。

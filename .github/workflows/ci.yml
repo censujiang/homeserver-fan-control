@@ -20,6 +20,7 @@ jobs:
       - run: bun run typecheck
       - run: bun run lint
       - run: bun run test
+      - run: bash scripts/installer-test.sh
       - run: bun run build
       - run: bun run compile
       - run: bash scripts/smoke.sh
@@ -31,8 +32,9 @@ jobs:
       - run: |
           cp dist/homeserver-fan-control dist/homeserver-fan-control-linux-x64-baseline
           docker save homeserver-fan-control:ci | gzip -n > dist/homeserver-fan-control-docker-linux-amd64.tar.gz
+          cp install.sh dist/install.sh
           cd dist
-          sha256sum homeserver-fan-control-linux-x64-baseline homeserver-fan-control-docker-linux-amd64.tar.gz > SHA256SUMS
+          sha256sum homeserver-fan-control-linux-x64-baseline homeserver-fan-control-docker-linux-amd64.tar.gz install.sh > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64-release-assets
@@ -40,6 +42,7 @@ jobs:
             dist/homeserver-fan-control-linux-x64-baseline
             dist/homeserver-fan-control-docker-linux-amd64.tar.gz
             dist/SHA256SUMS
+            dist/install.sh
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/master' && contains(github.event.head_commit.message, '[release]'))
@@ -60,4 +63,4 @@ jobs:
           tag="v$(jq -r .version package.json)"
           if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "$tag" ]]; then echo 'Tag must match package version'; exit 1; fi
           if gh release view "$tag" >/dev/null 2>&1; then echo "Release already exists: $tag"; exit 0; fi
-          gh release create "$tag" --target "$GITHUB_SHA" --title "HomeServer Fan Control $tag" --prerelease --notes-file docs/release-notes.md dist/homeserver-fan-control-linux-x64-baseline dist/homeserver-fan-control-docker-linux-amd64.tar.gz dist/SHA256SUMS
+          gh release create "$tag" --target "$GITHUB_SHA" --title "HomeServer Fan Control $tag" --prerelease --notes-file docs/release-notes.md dist/homeserver-fan-control-linux-x64-baseline dist/homeserver-fan-control-docker-linux-amd64.tar.gz dist/SHA256SUMS dist/install.sh

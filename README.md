@@ -19,22 +19,31 @@
 - 外置 ZIP 插件安装、校验及管理；隔离执行是实验功能，默认关闭。
 - Linux x86_64 baseline 单文件、Docker 镜像、Compose、systemd。
 
-### 快速开始：独立二进制（推荐 Linux 裸金属 / 物理机）
+### 快速安装与更新（推荐）
 
-老款 x86_64 CPU（如 Ivy Bridge / Xeon E5 v2）请使用 v0.3.0-alpha.4 或更新的发行版。alpha.1–alpha.3 内嵌 Bun 1.3.13，已在实机发现 Illegal instruction。alpha.4 起采用 Bun 1.4.5 的统一 x64 构建，保留原发行附件名称以兼容下载和更新器。
-
-在 Linux x86_64 物理机上复制以下命令即可下载、校验并启动（需要 curl、python3 和 sha256sum）。自动选择已发布且附件齐全的版本（含预发行版），其他版本请查看 [Releases](https://github.com/censujiang/homeserver-fan-control/releases)。建议优先在被管理的裸金属 Linux 服务器运行；虚拟机或其他主机也可使用兼容的远程插件。
+在 Linux x86_64 上下载并运行统一安装脚本，选择独立二进制或 Docker：
 
 ```sh
-BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
-curl -fL --connect-timeout 15 --retry 3 "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
-curl -fL --connect-timeout 15 --max-time 60 --retry 3 "$BASE/SHA256SUMS" -o SHA256SUMS && \
-grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
-chmod +x homeserver-fan-control-linux-x64-baseline && \
-./homeserver-fan-control-linux-x64-baseline --port 8080
+curl -fL --retry 2 https://raw.githubusercontent.com/censujiang/homeserver-fan-control/master/install.sh -o install.sh && bash install.sh
 ```
 
-默认只监听 127.0.0.1:3000。上例为 127.0.0.1:8080，无需安装 Bun、Node.js 或 npm。
+建议先阅读 [install.sh](install.sh)，再执行；脚本需要 curl、python3、coreutils。Docker 模式要求宿主机已安装 Docker；独立部署不需要 Bun/Node.js。默认选择包含 Alpha 的预览通道；附加 `--stable` 只选稳定版。按 SemVer 在已发布、匹配附件齐全的 Release 中选择最高版本，不依赖 API 顺序。最低支持 alpha.4（老款 CPU 兼容修复）。
+
+同一命令可再次运行更新已有安装。脚本会校验 SHA-256、检测已有二进制或标准 Docker 容器，保留数据并备份旧版本。已有 systemd 服务可在核验进程后原位重启；旧 Screen/前台实例须先停止。首次安装默认回环监听，可用 SSH 隧道访问；不自动暴露公网。自定义 Docker/Compose 配置请使用原部署定义更新，脚本不会擅自丢弃设备、权限或挂载。
+
+### 快速开始：独立二进制（推荐 Linux 裸金属 / 物理机）
+
+```sh
+bash install.sh --binary
+```
+
+指定已有独立程序的位置、数据目录和端口（先停止旧 Screen/前台进程；实际目录按部署修改）：
+
+```sh
+bash install.sh --binary --update --path /root/homeserver-fan-control/homeserver-fan-control-linux-x64-baseline --data-dir /root/data --host 0.0.0.0 --port 9001 --start screen
+```
+
+程序默认只监听 127.0.0.1:3000；安装脚本默认 127.0.0.1:8080，无需安装 Bun、Node.js 或 npm。
 从 alpha.6 起，首次打开页面直接设置并确认管理员密码（12～128 字符），无需 setup key。默认只允许回环监听上的本机初始化；远程服务器可用 `ssh -L 8080:127.0.0.1:8080 user@server` 建立隧道，再打开 http://127.0.0.1:8080。旧版 alpha.5 及以前仍需要密钥（`cat ./data/setup-token; echo`）。
 
 **SSH 断开后继续运行（Debian/Ubuntu/PVE）：** 先停止当前前台程序（Ctrl+C），不要重复启动同一数据目录。
@@ -70,22 +79,13 @@ PORT=18080 ./homeserver-fan-control-linux-x64-baseline
 
 ### Docker 部署（Linux amd64）
 
-**方式 A：下载已构建的发行镜像，不需要源码。**
-
-复制以下命令下载发行镜像、校验并导入（需要 curl、python3 和 sha256sum）：
+**方式 A：通过统一脚本安装或更新已构建的发行镜像。**
 
 ```sh
-BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
-curl -fL --connect-timeout 15 --retry 3 "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
-curl -fL --connect-timeout 15 --max-time 60 --retry 3 "$BASE/SHA256SUMS" -o SHA256SUMS && \
-grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
-docker load -i homeserver-fan-control-docker-linux-amd64.tar.gz && \
-docker run -d --name hsfc --restart unless-stopped \
-  -p 127.0.0.1:8080:3000 \
-  -v hsfc-data:/data -e HSFC_ALLOW_REMOTE_SETUP=1 \
-  --security-opt no-new-privileges:true \
-  homeserver-fan-control:ci
+bash install.sh --docker
 ```
+
+默认容器名 hsfc、数据卷 hsfc-data、宿主端口 8080，可在运行时选择端口，或通过 --name / --volume 指定。更新会保留标准容器的现有端口及数据卷；保留停止的旧容器用于恢复。自定义配置请用原部署定义。
 
 宿主机访问 8080，容器内部监听 3000。首次通过回环映射进入页面创建管理员（alpha.6 起）；环境变量 HSFC_ALLOW_REMOTE_SETUP=1 仅用于初次设置，完成后建议重建容器移除变量并保留数据卷。也支持直接改变容器内部端口：
 
@@ -192,19 +192,26 @@ HomeServer Fan Control is an open-source cooling-management project for home ser
 - Validated ZIP plugin installation and management; isolated execution is experimental and disabled by default.
 - Linux x64 baseline standalone executable, Docker image, Compose and systemd.
 
-### Quick start: standalone executable (recommended on bare-metal Linux / physical machines)
+### Quick install and update (recommended)
 
-For older x86_64 CPUs (e.g. Ivy Bridge / Xeon E5 v2), use v0.3.0-alpha.4 or newer. Alpha.1–alpha.3 embed Bun 1.3.13, which produced an illegal-instruction crash on physical hardware. Alpha.4 uses Bun 1.4.5's unified x64 build while retaining the existing release asset name for download and updater compatibility.
-
-Copy these commands on a Linux x86_64 machine to download, verify and start the application (requires curl, python3 and sha256sum). This selects a published release with all assets (including previews); see [Releases](https://github.com/censujiang/homeserver-fan-control/releases) for other versions. Prefer the managed bare-metal Linux server; VMs and other hosts can also use compatible remote plugins.
+Download and review the unified installer on Linux x86_64, then select standalone or Docker:
 
 ```sh
-BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
-curl -fL --connect-timeout 15 --retry 3 "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
-curl -fL --connect-timeout 15 --max-time 60 --retry 3 "$BASE/SHA256SUMS" -o SHA256SUMS && \
-grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
-chmod +x homeserver-fan-control-linux-x64-baseline && \
-./homeserver-fan-control-linux-x64-baseline --port 8080
+curl -fL --retry 2 https://raw.githubusercontent.com/censujiang/homeserver-fan-control/master/install.sh -o install.sh && bash install.sh
+```
+
+Requires curl, python3 and coreutils; Docker mode requires an existing Docker Engine. Standalone needs no Bun or Node.js. Preview (including Alpha) is the default; use `--stable` for stable releases only. The installer chooses the highest SemVer among published releases with matching uploaded assets, regardless of API order; alpha.4 is the minimum for legacy CPU compatibility. Run again to update. Verified existing systemd services can be restarted in place; stop older foreground/Screen processes first. Standard Docker named-volume deployments are supported; custom Docker/Compose deployments must use their original definition. First installation binds loopback; use an SSH tunnel.
+
+### Quick start: standalone executable
+
+```sh
+bash install.sh --binary
+```
+
+For an existing standalone executable, specify the actual path and data directory:
+
+```sh
+bash install.sh --binary --update --path /path/to/homeserver-fan-control-linux-x64-baseline --data-dir /path/to/data --host 127.0.0.1 --port 8080 --start screen
 ```
 
 From alpha.6, open http://127.0.0.1:8080 and create/confirm an administrator password (12–128 characters); no setup key is required. Use `ssh -L 8080:127.0.0.1:8080 user@server` for remote access. Alpha.5 and older require the legacy key (`cat ./data/setup-token; echo`). No separate Bun or Node.js installation is required.
@@ -240,18 +247,13 @@ Use a firewall and an HTTPS reverse proxy before exposing the service beyond loo
 
 ### Docker (Linux amd64)
 
-**Option A: load the published image archive.** Copy the following commands to download, verify and load the release image (requires curl, python3 and sha256sum).
+**Option A: install/update the published image with the unified installer.**
 
 ```sh
-BASE=$(curl -fsSL 'https://api.github.com/repos/censujiang/homeserver-fan-control/releases?per_page=30' | python3 -c 'import json,sys; releases=json.load(sys.stdin); required={"homeserver-fan-control-linux-x64-baseline","homeserver-fan-control-docker-linux-amd64.tar.gz","SHA256SUMS"}; print(next("https://github.com/censujiang/homeserver-fan-control/releases/download/"+r["tag_name"] for r in releases if not r["draft"] and required <= {a["name"] for a in r["assets"] if a["state"]=="uploaded"}))') && \
-curl -fL --connect-timeout 15 --retry 3 "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
-curl -fL --connect-timeout 15 --max-time 60 --retry 3 "$BASE/SHA256SUMS" -o SHA256SUMS && \
-grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
-docker load -i homeserver-fan-control-docker-linux-amd64.tar.gz && \
-docker run -d --name hsfc --restart unless-stopped \
-  -p 127.0.0.1:8080:3000 -v hsfc-data:/data -e HSFC_ALLOW_REMOTE_SETUP=1 \
-  --security-opt no-new-privileges:true homeserver-fan-control:ci
+bash install.sh --docker
 ```
+
+Default container hsfc, named volume hsfc-data, host port 8080. Choose a port or use --name / --volume. Existing standard containers keep their port and volume; the retired container remains stopped for recovery. Custom configurations must use their original deployment definition.
 
 The host port is 8080; the container port is 3000. For alpha.6+, create the administrator via the loopback-published UI. HSFC_ALLOW_REMOTE_SETUP=1 is only for first setup; recreate the container without it after setup, keeping the data volume. To change the internal port as well:
 
