@@ -4,6 +4,9 @@ Usage: homeserver-fan-control [options]
   -H, --host <address>   Listen address (default 127.0.0.1)
       --data-dir <path>  Persistent data directory (default ./data)
   -h, --help            Show help
+      --version         Show installed version
+      --check-update [--stable|--preview]  Check GitHub releases
+      --update [--stable|--preview]        Replace standalone executable (stop service first)
 CLI options override NITRO_PORT/PORT, NITRO_HOST/HOST and HSFC_DATA_DIR.
 `
 export function parseArgs(args:string[],env:Record<string,string|undefined>={}){

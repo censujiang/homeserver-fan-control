@@ -21,10 +21,10 @@
 
 ### 快速开始：独立二进制（推荐 Linux 裸金属 / 物理机）
 
-在 Linux x86_64 物理机上复制以下命令即可下载、校验并启动（需要 curl 和 sha256sum）。当前示例使用公开版本 v0.3.0-alpha.1，其他版本请查看 [Releases](https://github.com/censujiang/homeserver-fan-control/releases)。建议优先在被管理的裸金属 Linux 服务器运行；虚拟机或其他主机也可使用兼容的远程插件。
+在 Linux x86_64 物理机上复制以下命令即可下载、校验并启动（需要 curl 和 sha256sum）。当前示例使用公开版本 v0.3.0-alpha.2，其他版本请查看 [Releases](https://github.com/censujiang/homeserver-fan-control/releases)。建议优先在被管理的裸金属 Linux 服务器运行；虚拟机或其他主机也可使用兼容的远程插件。
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.1
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.2
 curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
@@ -66,7 +66,7 @@ PORT=18080 ./homeserver-fan-control-linux-x64-baseline
 复制以下命令下载发行镜像、校验并导入：
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.1
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.2
 curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
@@ -130,6 +130,18 @@ Environment=NITRO_HOST=127.0.0.1
 
 保存后 `sudo systemctl restart homeserver-fan-control`。需要本地设备访问时，请参考所选插件文档配置最小权限。
 
+### 在线更新
+
+在 Web 后台的「软件更新」中选择稳定版或含预发行版通道，检查 GitHub Releases，并按部署类型下载匹配的发行附件。后台验证文件大小与 SHA-256，不会自动执行、替换程序或停止散热监控。
+
+独立二进制可在终端检查更新：
+
+```sh
+./homeserver-fan-control-linux-x64-baseline --check-update
+```
+
+先停止原服务并备份数据，再使用原运行文件执行 `--update`（安装至系统目录时需有目录写权限）。新文件原子替换旧文件，旧版本保留为 `.previous`，请手动启动服务。若已有 `.previous`，请先移走保存，避免覆盖旧备份。Docker 从宿主机导入新镜像后用同一数据卷重建容器；源码部署重新构建。参见[在线更新指南](docs/updates.md)。
+
 ### 数据管理及升级
 
 数据目录包含 database.sqlite、config.key、插件及初始化密钥（初始化前）。备份前停止进程或容器，完整备份数据目录（包括 SQLite WAL/SHM 如存在）；恢复时保留同一加密密钥及文件所有权。数据包含敏感信息，备份需受保护。更新时停止旧程序，替换二进制或镜像，重新启动；保留数据目录或 Docker 数据卷。卸载程序不等同于删除数据。
@@ -170,10 +182,10 @@ HomeServer Fan Control is an open-source cooling-management project for home ser
 
 ### Quick start: standalone executable (recommended on bare-metal Linux / physical machines)
 
-Copy these commands on a Linux x86_64 machine to download, verify and start the application (requires curl and sha256sum). The example uses public release v0.3.0-alpha.1; see [Releases](https://github.com/censujiang/homeserver-fan-control/releases) for other versions. Prefer the managed bare-metal Linux server; VMs and other hosts can also use compatible remote plugins.
+Copy these commands on a Linux x86_64 machine to download, verify and start the application (requires curl and sha256sum). The example uses public release v0.3.0-alpha.2; see [Releases](https://github.com/censujiang/homeserver-fan-control/releases) for other versions. Prefer the managed bare-metal Linux server; VMs and other hosts can also use compatible remote plugins.
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.1
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.2
 curl -fL "$BASE/homeserver-fan-control-linux-x64-baseline" -o homeserver-fan-control-linux-x64-baseline && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-linux-x64-baseline$' SHA256SUMS | sha256sum -c - && \
@@ -212,7 +224,7 @@ Use a firewall and an HTTPS reverse proxy before exposing the service beyond loo
 **Option A: load the published image archive.** Copy the following commands to download, verify and load the release image.
 
 ```sh
-BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.1
+BASE=https://github.com/censujiang/homeserver-fan-control/releases/download/v0.3.0-alpha.2
 curl -fL "$BASE/homeserver-fan-control-docker-linux-amd64.tar.gz" -o homeserver-fan-control-docker-linux-amd64.tar.gz && \
 curl -fL "$BASE/SHA256SUMS" -o SHA256SUMS && \
 grep '  homeserver-fan-control-docker-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c - && \
@@ -271,6 +283,16 @@ Environment=NITRO_HOST=127.0.0.1
 ```
 
 Restart the service. Grant local device access separately, following the selected plugin documentation.
+
+### Online updates
+
+Open Software updates in the Web UI, select the stable or preview channel, check GitHub Releases and download the matching deployment asset. The server verifies its size and SHA-256. It does not execute the download, replace the running application or stop cooling monitoring automatically.
+
+```sh
+./homeserver-fan-control-linux-x64-baseline --check-update
+```
+
+Stop the service and back up data first, then run the current binary with `--update` (write permission to its directory is required). The binary is atomically replaced and the old executable retained as `.previous`; restart manually. Move an existing backup away before updating again. Docker deployments load the new image on the host and recreate the container with the same data volume; source deployments rebuild. See the [update guide](docs/updates.md).
 
 ### Persistence, backup and upgrade
 

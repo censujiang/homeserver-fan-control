@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
  && install -d -m 0700 -o 10001 -g 10001 /data
 COPY --from=artifact /src/dist/homeserver-fan-control /usr/local/bin/homeserver-fan-control
 USER 10001:10001
-ENV HSFC_DATA_DIR=/data NITRO_HOST=0.0.0.0 NITRO_PORT=3000
+ENV HSFC_DEPLOYMENT=docker HSFC_DATA_DIR=/data NITRO_HOST=0.0.0.0 NITRO_PORT=3000
 EXPOSE 3000
 VOLUME ["/data"]
 ENTRYPOINT ["/usr/local/bin/homeserver-fan-control"]

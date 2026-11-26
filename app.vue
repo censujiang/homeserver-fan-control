@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { type UpdateStatus, type Channel, releasePage } from './shared/release'
 import { defaultPolicy, type Manifest, type Instance, type Policy } from './shared/model'
 type PublicInstance=Omit<Instance,'config'> & {configuredFields:string[];live:{online:boolean;error?:string;sample?:{at:number;identity:string|null;health:string;fanMode?:string;fanLevel?:number;sensors:{id:string;name:string;kind:string;value:number|null;unit:string;health:string}[]};capability?:{reason:string};decision?:{target:number|null;reason:string}}}
 type Dashboard={plugins:Manifest[];instances:PublicInstance[];events:{id:number;at:number;message:string;instance:string|null}[]}
 const token=ref(''), password=ref(''), setupToken=ref(''), needsSetup=ref(false), error=ref(''), busy=ref(false), dash=ref<Dashboard>(), tab=ref('monitor'), dark=ref(false), lang=ref('zh')
 const text=(zh:string,en:string)=>lang.value==='zh'?zh:en
 const form=reactive({id:'',name:'',plugin:'mock',transport:'mock',mode:'MONITOR',enabled:true,config:{} as Record<string,unknown>,policy:JSON.stringify(defaultPolicy,null,2)})
+const update=ref<UpdateStatus>(), channel=ref<Channel>('preview'), updateBusy=ref(false), updateError=ref('')
+async function refreshUpdate(){if(!token.value||tab.value!=='updates')return;try{update.value=await $fetch<UpdateStatus>('/api/update/status',{headers:auth()})}catch{updateError.value=text('读取更新状态失败','Could not load update status')}}
+async function updateAction(check:boolean){updateBusy.value=true;updateError.value='';try{
+ if(check)update.value=await $fetch<UpdateStatus>('/api/update/check',{method:'POST',headers:auth(),body:{channel:channel.value}})
+ else if(update.value?.latest)update.value=await $fetch<UpdateStatus>('/api/update/download',{method:'POST',headers:auth(),body:{tag:update.value.latest.tag}})
+ }catch{updateError.value=text('更新操作失败，请检查 GitHub 连接或稍后重试。','Update failed; check GitHub connectivity or try again later.')}finally{updateBusy.value=false}}
+watch(tab,async v=>{if(v==='updates'){await refreshUpdate();channel.value=update.value?.channel??'preview'}})
 const installedPlugins=ref<Manifest[]>([])
 const uploadFile=ref<File>()
 async function listPlugins(){installedPlugins.value=await $fetch<Manifest[]>('/api/plugins',{headers:auth()})}
@@ -43,7 +51,7 @@ async function save(){await action(async()=>{
 async function remove(id:string){if(!confirm(text('删除此服务器配置？','Remove this server?')))return;await action(async()=>{await $fetch('/api/instances/'+id,{method:'DELETE',headers:auth()});await refresh()})}
 async function readHistory(){if(!historyId.value)return;await action(async()=>{history.value=await $fetch('/api/history',{headers:auth(),query:{id:historyId.value,from:Date.now()-86400000}})})}
 let timer:ReturnType<typeof setInterval>|undefined
-onMounted(async()=>{reset();token.value=sessionStorage.getItem('token')??'';dark.value=matchMedia('(prefers-color-scheme: dark)').matches;const s=await $fetch<{setup:boolean}>('/api/auth/status');needsSetup.value=s.setup;await refresh();timer=setInterval(refresh,5000)})
+onMounted(async()=>{reset();token.value=sessionStorage.getItem('token')??'';dark.value=matchMedia('(prefers-color-scheme: dark)').matches;const s=await $fetch<{setup:boolean}>('/api/auth/status');needsSetup.value=s.setup;await refresh();timer=setInterval(()=>{void refresh();void refreshUpdate()},5000)})
 onBeforeUnmount(()=>clearInterval(timer))
 </script>
 <template>
@@ -52,7 +60,7 @@ onBeforeUnmount(()=>clearInterval(timer))
   <div v-if="error" role="alert" class="warning">{{error}}</div>
   <section v-if="!token" class="login"><h2>{{needsSetup?text('初始化管理员','Initialize administrator'):text('管理员登录','Administrator login')}}</h2><form @submit.prevent="signIn"><label v-if="needsSetup">{{text('数据目录 setup-token 文件中的密钥','Token from setup-token in data directory')}}<input v-model="setupToken" type="password" required></label><label>{{text('管理员密码','Password')}}<input v-model="password" type="password" required :minlength="needsSetup?12:1"></label><button :disabled="busy">{{text('继续','Continue')}}</button></form></section>
   <template v-else>
-   <nav><button v-for="[id,zh,en] in [['monitor','监控','Monitor'],['servers','服务器 / 策略','Servers / policies'],['plugins','插件','Plugins'],['history','历史','History'],['events','事件','Events']]" :key="id" :class="{active:tab===id}" @click="tab=id">{{text(zh,en)}}</button></nav>
+   <nav><button v-for="[id,zh,en] in [['monitor','监控','Monitor'],['servers','服务器 / 策略','Servers / policies'],['plugins','插件','Plugins'],['history','历史','History'],['events','事件','Events'],['updates','软件更新','Updates']]" :key="id" :class="{active:tab===id}" @click="tab=id">{{text(zh,en)}}</button></nav>
    <p class="warning">{{text('安全预览：当前硬件驱动禁止写入，原厂自动散热不受影响。','Safety preview: all physical hardware writes are blocked. Factory cooling remains untouched.')}}</p>
    <section v-if="tab==='monitor'">
     <h2>{{text('实时状态','Live status')}}</h2><p v-if="!dash?.instances.length">{{text('尚未添加服务器。','No servers configured.')}}</p>
@@ -76,6 +84,24 @@ onBeforeUnmount(()=>clearInterval(timer))
    </section>
    <section v-if="tab==='plugins'"><h2>{{text('内置插件','Built-in plugins')}}</h2><article v-for="p in dash?.plugins" :key="p.id"><h3>{{p.name}} <small>{{p.version}}</small></h3><p>{{p.description}}</p><p>{{p.modes.map(m=>m.label).join(' / ')}}</p></article><h2>{{text('外置插件（实验功能）','External plugins (experimental)')}}</h2><p>{{text('安装不会执行代码。隔离执行需管理员在宿主机显式启用，尚待验证。','Installation does not execute code. Isolated execution requires host opt-in and remains unverified.')}}</p><input type="file" accept=".zip" @change="chooseFile"><button :disabled="busy||!uploadFile" @click="upload">{{text('上传 ZIP','Upload ZIP')}}</button><article v-for="p in installedPlugins" :key="p.id"><h3>{{p.name}} · {{p.version}}</h3><p>{{p.id}}</p><div class="actions"><button @click="managePlugin(p.id,true)">{{text('启用','Enable')}}</button><button @click="managePlugin(p.id,false)">{{text('禁用','Disable')}}</button><button @click="uninstallPlugin(p.id)">{{text('卸载','Uninstall')}}</button></div></article></section>
    <section v-if="tab==='history'"><h2>{{text('过去24小时采样','Last 24 hours')}}</h2><div class="actions"><select v-model="historyId"><option value="">—</option><option v-for="i in dash?.instances" :key="i.id" :value="i.id">{{i.name}}</option></select><button @click="readHistory">{{text('查询','Query')}}</button></div><article v-for="h in history.slice().reverse()" :key="h.at"><small>{{new Date(h.at).toLocaleString()}}</small><p>{{h.live.sample?.sensors.filter(s=>s.kind!=='discrete').map(s=>s.name+': '+s.value+' '+s.unit).join(' · ')}}</p></article></section>
+   <section v-if="tab==='updates'">
+    <h2>{{text('软件更新','Software updates')}}</h2>
+    <article><p>{{text('当前版本','Installed version')}}: <strong>{{update?.current??'—'}}</strong> · {{update?.deployment??'—'}}</p>
+     <div class="actions"><label>{{text('更新通道','Update channel')}}<select v-model="channel" :disabled="updateBusy||update?.state==='downloading'"><option value="stable">{{text('稳定版','Stable')}}</option><option value="preview">{{text('含预发行版','Include previews')}}</option></select></label><button :disabled="updateBusy||update?.state==='downloading'" @click="updateAction(true)">{{text('检查更新','Check for updates')}}</button></div>
+     <p v-if="updateError" role="alert">{{updateError}}</p><p v-if="update?.checkedAt"><small>{{text('检查时间','Last checked')}}: {{new Date(update.checkedAt).toLocaleString()}}</small></p>
+     <p v-if="update?.checkedAt&&!update.latest">{{text('没有更新的兼容版本。','No newer compatible release.')}}</p>
+     <template v-if="update?.latest"><h3>{{update.latest.tag}}</h3><p>{{(update.latest.size/1048576).toFixed(1)}} MiB · {{update.latest.prerelease?'Pre-release':'Stable'}}</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">{{update.latest.notes}}</pre><a :href="update.latest.url" target="_blank" rel="noopener noreferrer">{{text('发行说明及手动下载','Release notes and manual download')}}</a>
+      <div v-if="update.deployment!=='source'"><button :disabled="updateBusy||update.state==='downloading'" @click="updateAction(false)">{{text('下载并校验更新','Download and verify update')}}</button></div>
+      <div v-if="update.state==='downloading'"><progress :value="update.downloaded" :max="update.total"></progress><p>{{(update.downloaded/1048576).toFixed(1)}} / {{(update.total/1048576).toFixed(1)}} MiB</p></div>
+      <p v-if="update.state==='failed'" role="alert">{{update.error}}</p>
+      <p v-if="update.state==='ready'">{{text('已通过 SHA-256 校验，保存在服务器：','SHA-256 verified; saved on server:')}} <code>{{update.file}}</code></p>
+     </template>
+     <p v-if="update?.deployment==='binary'">{{text('下载不会停止监控或替换正在运行的程序。停止服务后在终端执行当前二进制 --update，再手动启动。旧程序保留为 .previous。','Downloading does not stop monitoring or replace the running program. Stop the service, run the current executable with --update, then start it manually. The previous executable is retained as .previous.')}}</p>
+     <p v-else-if="update?.deployment==='docker'">{{text('请在宿主机导入新镜像并使用原数据卷重建容器；容器不应自行替换程序。','Load the new image on the host and recreate the container with the same data volume; containers must not replace their own executable.')}}</p>
+     <p v-else>{{text('源码部署请更新 Git 仓库并重新构建。','For source deployments, update the repository and rebuild.')}}</p>
+     <a :href="releasePage" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
+    </article>
+   </section>
    <section v-if="tab==='events'"><h2>{{text('事件记录','Events')}}</h2><article v-for="e in dash?.events" :key="e.id"><small>{{new Date(e.at).toLocaleString()}}</small><p>{{e.message}}</p></article></section>
   </template>
  </main>

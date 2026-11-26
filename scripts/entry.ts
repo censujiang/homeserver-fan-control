@@ -8,7 +8,13 @@ if(process.argv.includes('--plugin-worker')){
  const input=JSON.parse(await Bun.stdin.text())
  const result=await plugin.sample(input.mode,input.config)
  process.stdout.write(JSON.stringify(result))
+}else if(['--update','--check-update'].includes(process.argv[2]??'')){
+ const {updateCli}=await import('./update')
+ try{await updateCli(process.argv.slice(2),Bun.main.includes('/$bunfs/')||import.meta.path.includes('/$bunfs/'))}catch(e){console.error((e as Error).message);process.exitCode=1}
+}else if(process.argv[2]==='--version'){
+ const {currentVersion}=await import('../shared/release');console.log(currentVersion)
 }else{
+ if(process.env.HSFC_DEPLOYMENT!=='docker')process.env.HSFC_DEPLOYMENT=Bun.main.includes('/$bunfs/')||import.meta.path.includes('/$bunfs/')?'binary':'source'
  const {parseArgs,help}=await import('./cli')
  try{
   const cfg=parseArgs(process.argv.slice(2),process.env)
